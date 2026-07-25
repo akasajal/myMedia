@@ -196,7 +196,7 @@ class MediaRepository(private val context: Context) {
         // 3. Deduplicate and remove deleted — do NOT filter by visibility here.
         //    The ViewModel applies visibility so the folder tree always knows about
         //    hidden folders (they stay in the tree with a VisibilityOff icon).
-        val allItems = items.filter { it.id !in deletedIds }.distinctBy { it.name }
+        val allItems = items.filter { it.id !in deletedIds }.distinctBy { it.id }  // Bug 2 fix: deduplicate by id, not name
 
         sortItems(allItems, getSortOrder())
     }
@@ -336,10 +336,10 @@ class MediaRepository(private val context: Context) {
             item.id, item.uri, item.name, item.dateTaken, item.size,
             item.mimeType, item.width, item.height, item.duration,
             item.mediaType.name, item.albumId, item.parentUri?.toString() ?: ""
-        ).joinToString("|")
+        ).joinToString("\u0000")  // use null byte — cannot appear in file names or URIs
 
     private fun deserializeMediaItem(s: String): MediaItem? = try {
-        val p = s.split("|")
+        val p = s.split("\u0000")  //  match new delimiter
         val id = p[0].toLong()
         val parentUriStr = if (p.size > 11) p[11] else ""
         MediaItem(
@@ -400,7 +400,9 @@ class MediaRepository(private val context: Context) {
                     addDiscoveredFolder(subAlbumPath)
                     recursiveScanSafOptimized(uri, treeUri, subAlbumPath, result)
                 } else if (mime.startsWith("image/") || mime.startsWith("video/")) {
-                    val id = uri.toString().hashCode().toLong()
+                    // use 64-bit hash to avoid collisions from 32-bit hashCode()
+                    val uriStr = uri.toString()
+                    val id = uriStr.hashCode().toLong() xor (uriStr.reversed().hashCode().toLong() shl 32)
                     val type = when {
                         mime.contains("gif") -> MediaType.GIF
                         mime.startsWith("video/") -> MediaType.VIDEO
@@ -432,17 +434,30 @@ class MediaRepository(private val context: Context) {
         mediaType: MediaType,
         chosenFolders: Set<String>
     ): List<MediaItem> {
-        val projection = arrayOf(
-            MediaStore.MediaColumns._ID,
-            MediaStore.MediaColumns.DISPLAY_NAME,
-            MediaStore.MediaColumns.DATE_TAKEN,
-            MediaStore.MediaColumns.SIZE,
-            MediaStore.MediaColumns.MIME_TYPE,
-            MediaStore.MediaColumns.WIDTH,
-            MediaStore.MediaColumns.HEIGHT,
-            MediaStore.MediaColumns.DATA,
-            if (mediaType == MediaType.VIDEO) MediaStore.Video.Media.DURATION else MediaStore.MediaColumns._ID,
-        )
+        val projection = if (mediaType == MediaType.VIDEO) {
+            arrayOf(
+                MediaStore.MediaColumns._ID,
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.DATE_TAKEN,
+                MediaStore.MediaColumns.SIZE,
+                MediaStore.MediaColumns.MIME_TYPE,
+                MediaStore.MediaColumns.WIDTH,
+                MediaStore.MediaColumns.HEIGHT,
+                MediaStore.MediaColumns.DATA,
+                MediaStore.Video.Media.DURATION,
+            )
+        } else {
+            arrayOf(
+                MediaStore.MediaColumns._ID,
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.DATE_TAKEN,
+                MediaStore.MediaColumns.SIZE,
+                MediaStore.MediaColumns.MIME_TYPE,
+                MediaStore.MediaColumns.WIDTH,
+                MediaStore.MediaColumns.HEIGHT,
+                MediaStore.MediaColumns.DATA,
+            )
+        }
 
         val result = mutableListOf<MediaItem>()
         context.contentResolver.query(
@@ -552,10 +567,10 @@ class MediaRepository(private val context: Context) {
             item.id, item.uri, item.name, item.deletedAt,
             item.originalAlbumId, item.mimeType, item.size,
             item.duration, item.mediaType.name,
-        ).joinToString("|")
+        ).joinToString("\u0000")  // use null byte — cannot appear in file names or URIs
 
     private fun deserializeDeleted(s: String): DeletedItem? = try {
-        val p = s.split("|")
+        val p = s.split("\u0000")  // match new delimiter
         DeletedItem(
             id              = p[0].toLong(),
             uri             = Uri.parse(p[1]),
@@ -576,9 +591,15 @@ class MediaRepository(private val context: Context) {
         val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000)
         val (validItems, expiredItems) = allItems.partition { it.deletedAt > thirtyDaysAgo }
 
+        // batch-remove all expired items in one prefs write instead of recursing,
+        // which could loop infinitely if a deletion keeps failing.
         if (expiredItems.isNotEmpty()) {
-            expiredItems.forEach { permanentlyDelete(it) }
-            return getDeletedItems() // Recursive call to get the fresh state
+            val expiredIds = expiredItems.map { it.id }.toSet()
+            val updatedRaw = raw.filter { s -> deserializeDeleted(s)?.id !in expiredIds }.toSet()
+            prefs.edit().putStringSet("recycle_bin", updatedRaw).apply()
+            expiredItems.forEach { item ->
+                try { context.contentResolver.delete(item.uri, null, null) } catch (_: Exception) {}
+            }
         }
 
         return validItems.sortedByDescending { it.deletedAt }

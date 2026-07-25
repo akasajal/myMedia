@@ -59,7 +59,7 @@ enum class SortOrder { DATE_DESC, DATE_ASC, NAME_ASC, SIZE_DESC }
 
 data class PrivacyPrefs(
     val pinEnabled: Boolean = false,
-    val pin: String = "",           // stored hashed in repo; plain here only in memory
+    val pin: String = "",           // holds the HASH (read from "pin_hash" prefs), never plaintext; use PrivacyRepository.checkPin() for comparison
     val biometricsEnabled: Boolean = false,
     val instantLockEnabled: Boolean = false,
 )

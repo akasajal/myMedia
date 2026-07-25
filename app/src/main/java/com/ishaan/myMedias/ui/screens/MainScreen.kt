@@ -50,6 +50,21 @@ fun MainScreen(viewModel: GalleryViewModel) {
     // Viewer
     var viewerState by remember { mutableStateOf<ViewerState?>(null) }
 
+    LaunchedEffect(uiState.allMedia) {
+        val vs = viewerState ?: return@LaunchedEffect
+        val newItems = uiState.allMedia
+        if (newItems == vs.items) return@LaunchedEffect
+        // Remap the current index to the same item in the updated list (it may have shifted).
+        val currentId = vs.items.getOrNull(vs.index)?.id
+        val newIndex = if (currentId != null) newItems.indexOfFirst { it.id == currentId } else -1
+        if (newIndex < 0) {
+            // Current item was removed (deleted externally); close the viewer.
+            viewerState = null
+        } else {
+            viewerState = vs.copy(items = newItems, index = newIndex)
+        }
+    }
+
     // Recycle bin navigation
     var showRecycleBin by remember { mutableStateOf(false) }
 

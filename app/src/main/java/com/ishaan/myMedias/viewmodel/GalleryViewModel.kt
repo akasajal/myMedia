@@ -118,9 +118,14 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                         currentMedia.addAll(newItems)
                         currentMedia.sortByDescending { it.dateTaken }
 
+                        val currentRaw = _uiState.value.rawMedia.toMutableList()
+                        val currentRawIds = currentRaw.map { it.id }.toSet()
+                        currentRaw.addAll(updatedSaf.filter { it.id !in currentRawIds && it.id !in deletedIds })
+                        currentRaw.sortByDescending { it.dateTaken }
+
                         val groups = repo.groupByDate(currentMedia)
                         val albums = repo.buildAlbums(currentMedia)
-                        _uiState.update { it.copy(allMedia = currentMedia, mediaGroups = groups, albums = albums) }
+                        _uiState.update { it.copy(rawMedia = currentRaw, allMedia = currentMedia, mediaGroups = groups, albums = albums) }
                     }
                 }
             } catch (e: Exception) {
@@ -163,6 +168,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             val albums = repo.buildAlbums(visibleMedia)
             _uiState.update {
                 it.copy(
+                    allMedia    = visibleMedia,  // Bug 1 fix: keep allMedia in sync with visibility
                     mediaGroups = groups,
                     albums      = albums,
                 )
@@ -251,7 +257,10 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         val updated = _uiState.value.allMedia.map {
             if (it.id == item.id) it.copy(isFavorite = !it.isFavorite) else it
         }
-        _uiState.update { it.copy(allMedia = updated, favorites = updated.filter { m -> m.isFavorite }) }
+        val updatedRaw = _uiState.value.rawMedia.map {
+            if (it.id == item.id) it.copy(isFavorite = !it.isFavorite) else it
+        }
+        _uiState.update { it.copy(rawMedia = updatedRaw, allMedia = updated, favorites = updated.filter { m -> m.isFavorite }) }
     }
 
     fun deleteMedia(item: MediaItem) {
@@ -263,6 +272,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         }
         _uiState.update {
             it.copy(
+                rawMedia     = it.rawMedia.filter { m -> m.id != item.id },  // Bug 6 fix: remove from rawMedia so it doesn't resurface on visibility toggle
                 allMedia     = updated,
                 mediaGroups  = updatedGroups,
                 favorites    = it.favorites.filter { m -> m.id != item.id },
