@@ -1,0 +1,38 @@
+# Built outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Build directories
+build/
+app/build/
+.gradle/
+.kotlin/
+captures/
+
+#Releases
+app/release/
+
+# Local config (machine-specific, never commit)
+local.properties
+*.iml
+
+# Android Studio
+.idea/
+*.orig
+.navigation/
+
+# Keystore files (sensitive — keep out of version control)
+*.jks
+*.keystore
+
+# Proguard generated files
+proguard/
+
+# Tests
+app/src/androidTest
+app/src/test
+
+# Log files
+*.log

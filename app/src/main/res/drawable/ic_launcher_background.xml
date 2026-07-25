@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adaptive icon background for myMedias.
+    Place in: res/drawable/ic_launcher_background.xml
+
+    Uses RichPlum (#6B3FA0) — the app's primary brand colour.
+    A subtle radial gradient from DeepGrape centre → RichPlum edge
+    gives depth without competing with the foreground artwork.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <gradient
+        android:type="radial"
+        android:gradientRadius="76%"
+        android:centerX="0.5"
+        android:centerY="0.5"
+        android:startColor="#9B59D4"
+        android:endColor="#6B3FA0" />
+
+</shape>

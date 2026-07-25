@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adaptive icon foreground for myMedias.
+    Place in: res/drawable/ic_launcher_foreground.xml
+
+    Companion files needed (not generated here):
+      res/drawable/ic_launcher_background.xml  → solid #6B3FA0 (RichPlum)
+      res/mipmap-anydpi-v26/ic_launcher.xml    → reference both via <adaptive-icon>
+      res/mipmap-anydpi-v26/ic_launcher_round.xml → same
+
+    The safe zone for adaptive icons is the inner 66dp of the 108dp canvas.
+    All artwork sits inside that zone (roughly x=21..87, y=21..87).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ── Outer lens ring (deep grape) ──────────────────────────── -->
+    <path
+        android:fillColor="#9B59D4"
+        android:pathData="
+            M54,22
+            A32,32 0 1,1 53.999,22 Z" />
+
+    <!-- ── Inner lens body (rich plum fill with soft purple ring) ── -->
+    <path
+        android:fillColor="#6B3FA0"
+        android:pathData="
+            M54,28
+            A26,26 0 1,1 53.999,28 Z" />
+
+    <!-- ── Glass reflection gradient circle ─────────────────────── -->
+    <!-- Primary glass: medium violet -->
+    <path
+        android:fillColor="#D49FFF"
+        android:pathData="
+            M54,34
+            A20,20 0 1,1 53.999,34 Z" />
+
+    <!-- Mid-glass: soft purple -->
+    <path
+        android:fillColor="#E4BCFF"
+        android:pathData="
+            M54,40
+            A14,14 0 1,1 53.999,40 Z" />
+
+    <!-- Core glint: near-white lavender -->
+    <path
+        android:fillColor="#F3E8FF"
+        android:pathData="
+            M54,46
+            A8,8 0 1,1 53.999,46 Z" />
+
+    <!-- ── Specular highlight (top-left glint) ───────────────────── -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.55"
+        android:pathData="
+            M46,36
+            A5,3 0 0,1 51,34
+            A5,3 0 0,1 46,36 Z" />
+
+    <!-- ── Camera body top bar ───────────────────────────────────── -->
+    <!-- Rounded rect across the top of the lens ring (viewfinder bump) -->
+    <path
+        android:fillColor="#9B59D4"
+        android:pathData="
+            M38,18 L70,18
+            Q74,18 74,22 L74,26
+            Q74,30 70,30 L38,30
+            Q34,30 34,26 L34,22
+            Q34,18 38,18 Z" />
+
+    <!-- Viewfinder dot -->
+    <path
+        android:fillColor="#C47FFF"
+        android:pathData="
+            M66,24
+            A3,3 0 1,1 65.999,24 Z" />
+
+    <!-- Flash dot -->
+    <path
+        android:fillColor="#E4BCFF"
+        android:pathData="
+            M58,24
+            A2,2 0 1,1 57.999,24 Z" />
+
+    <!-- ── Bottom label: subtle "myMedias" text hint via underline bar -->
+    <path
+        android:fillColor="#C47FFF"
+        android:fillAlpha="0.6"
+        android:pathData="
+            M42,82 L66,82
+            Q68,82 68,84 L68,86
+            Q68,88 66,88 L42,88
+            Q40,88 40,86 L40,84
+            Q40,82 42,82 Z" />
+
+</vector>
