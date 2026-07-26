@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace   = "com.ishaan.myMedias"
+    namespace   = "com.ishaan.myMedia"
     compileSdk  = 35
 
     lint {
@@ -13,7 +13,7 @@ android {
     }
 
     defaultConfig {
-        applicationId   = "com.ishaan.myMedias"
+        applicationId   = "com.ishaan.myMedia"
         minSdk          = 26
         targetSdk       = 35
         versionCode     = 1

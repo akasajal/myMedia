@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "myMedias"
+rootProject.name = "myMedia"
 include(":app")

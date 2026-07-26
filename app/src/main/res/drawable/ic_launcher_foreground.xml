@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Adaptive icon foreground for myMedias.
+    Adaptive icon foreground for myMedia.
     Place in: res/drawable/ic_launcher_foreground.xml
 
     Companion files needed (not generated here):
@@ -87,7 +87,7 @@
             M58,24
             A2,2 0 1,1 57.999,24 Z" />
 
-    <!-- ── Bottom label: subtle "myMedias" text hint via underline bar -->
+    <!-- ── Bottom label: subtle "myMedia" text hint via underline bar -->
     <path
         android:fillColor="#C47FFF"
         android:fillAlpha="0.6"
