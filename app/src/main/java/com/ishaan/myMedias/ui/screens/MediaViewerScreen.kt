@@ -414,10 +414,12 @@ fun ZoomableImage(
                             }
                             event.changes.forEach { it.consume() }
                             hasMoved = true
-                        } else if (dragChange != null && currentScale > 1f) {
-                            // Single finger drag when zoomed in
+                        } else if (dragChange != null) {
                             val pan = dragChange.position - dragChange.previousPosition
-                            if (pan.getDistance() > 1f) {
+                            // Always track movement so pager swipes don't fire onSingleTap
+                            if (pan.getDistance() > 8f) hasMoved = true
+
+                            if (currentScale > 1f && pan.getDistance() > 1f) {
                                 val boundsX = (size.width * (currentScale - 1) / 2)
                                 val boundsY = (size.height * (currentScale - 1) / 2)
 
