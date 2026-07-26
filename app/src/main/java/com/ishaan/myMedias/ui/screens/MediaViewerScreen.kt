@@ -78,6 +78,24 @@ fun MediaViewerScreen(
 
     val currentItem = items.getOrNull(pagerState.currentPage) ?: return
 
+    // Hoist ExoPlayer above the pager so it never lives inside a disposable page slot.
+    // Keyed to the current page URI — rebuilds only when you land on a different video.
+    val context = LocalContext.current
+    val currentVideoUri = if (currentItem.mediaType == MediaType.VIDEO) currentItem.uri else null
+    val exoPlayer = remember(currentVideoUri) {
+        currentVideoUri?.let { uri ->
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(ExoMediaItem.fromUri(uri))
+                repeatMode    = Player.REPEAT_MODE_ONE
+                playWhenReady = false
+                prepare()
+            }
+        }
+    }
+    DisposableEffect(currentVideoUri) {
+        onDispose { exoPlayer?.release() }
+    }
+
     // Sync strip when pager changes
     LaunchedEffect(pagerState.currentPage) {
         val page = pagerState.currentPage
@@ -99,8 +117,8 @@ fun MediaViewerScreen(
 
             if (item.mediaType == MediaType.VIDEO) {
                 InlineVideoPlayer(
-                    item      = item,
-                    onTap     = { showOverlay = !showOverlay },
+                    exoPlayer   = exoPlayer,
+                    onTap       = { showOverlay = !showOverlay },
                     onPlayClick = { onPlayVideo(item) }
                 )
             } else {
@@ -218,26 +236,10 @@ fun MediaViewerScreen(
 @OptIn(UnstableApi::class)
 @Composable
 fun InlineVideoPlayer(
-    item: MediaItem,
+    exoPlayer: ExoPlayer?,
     onTap: () -> Unit,
     onPlayClick: () -> Unit,
 ) {
-    val context = LocalContext.current
-
-    val exoPlayer = remember(item.uri) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(ExoMediaItem.fromUri(item.uri))
-            repeatMode    = Player.REPEAT_MODE_ONE
-            playWhenReady = false
-            prepare()
-        }
-    }
-
-    // Pause player when this screen is no longer active or disposed
-    DisposableEffect(exoPlayer) {
-        onDispose { exoPlayer.release() }
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -250,7 +252,7 @@ fun InlineVideoPlayer(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player             = exoPlayer
-                    useController      = false   // hide default controls; overlay handles UI
+                    useController      = false
                     resizeMode         = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     layoutParams       = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -258,6 +260,7 @@ fun InlineVideoPlayer(
                     )
                 }
             },
+            update = { view -> view.player = exoPlayer },
             modifier = Modifier.fillMaxSize(),
         )
 
