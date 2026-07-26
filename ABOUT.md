@@ -1,4 +1,4 @@
-# About myPhotos
+# About myMedia
 
 ---
 

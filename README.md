@@ -1,4 +1,4 @@
-# myPhotos
+# myMedia
 
 A native Android gallery app built with Jetpack Compose and Material 3.
 
@@ -25,7 +25,7 @@ A native Android gallery app built with Jetpack Compose and Material 3.
 ## Project Structure
 
 ```
-app/src/main/java/com/ishaan/myPhotos/
+app/src/main/java/com/ishaan/myMedia/
 ├── data/
 │   ├── model/
 │   │   └── Models.kt               # Data classes and enums (MediaItem, Album, FolderNode, etc.)
