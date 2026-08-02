@@ -82,18 +82,8 @@ fun AlbumsScreen(
         pinned + unpinned
     }
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showCreateDialog = true },
-                containerColor = PrimaryAccent,
-            ) {
-                Icon(Icons.Rounded.CreateNewFolder, "Create album", tint = Color.White)
-            }
-        },
-        containerColor = Color.Transparent,
-    ) { innerPadding ->
-        Column(modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
             // Sort bar
             AlbumSortBar(
                 current = sortOrder,
@@ -101,10 +91,8 @@ fun AlbumsScreen(
             )
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(12.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 80.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -118,6 +106,16 @@ fun AlbumsScreen(
                     )
                 }
             }
+        }
+
+        FloatingActionButton(
+            onClick = { showCreateDialog = true },
+            containerColor = PrimaryAccent,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            Icon(Icons.Rounded.CreateNewFolder, "Create album", tint = Color.White)
         }
     }
 
@@ -146,7 +144,7 @@ private fun AlbumSortBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 0.dp),
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
     ) {
