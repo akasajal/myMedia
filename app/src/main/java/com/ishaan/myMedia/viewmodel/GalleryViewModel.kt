@@ -32,6 +32,7 @@ data class GalleryUiState(
     val errorMessage: String? = null,
     val privacyPrefs: PrivacyPrefs = PrivacyPrefs(),
     val isLocked: Boolean = false,
+    val pinnedAlbumIds: Set<String> = emptySet(),
 )
 
 class GalleryViewModel(app: Application) : AndroidViewModel(app) {
@@ -63,6 +64,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             gridColumns = repo.getGridColumns(),
             sortOrder = repo.getSortOrder()
         ) }
+        loadPinnedAlbums()
         loadMedia()
     }
 
@@ -348,6 +350,53 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         repo.setSortOrder(order)
         _uiState.update { it.copy(sortOrder = order) }
         loadMedia()
+    }
+
+    // ── Bulk actions ──────────────────────────────────────────────────────
+
+    fun deleteMediaBulk(ids: Set<Long>) {
+        ids.forEach { id ->
+            val item = _uiState.value.allMedia.firstOrNull { it.id == id } ?: return@forEach
+            repo.deleteMedia(item)
+        }
+        val updated      = _uiState.value.allMedia.filter { it.id !in ids }
+        val updatedRaw   = _uiState.value.rawMedia.filter { it.id !in ids }
+        val updatedGroups = _uiState.value.mediaGroups.mapNotNull { group ->
+            val filtered = group.items.filter { it.id !in ids }
+            if (filtered.isEmpty()) null else group.copy(items = filtered)
+        }
+        _uiState.update {
+            it.copy(
+                allMedia     = updated,
+                rawMedia     = updatedRaw,
+                mediaGroups  = updatedGroups,
+                favorites    = it.favorites.filter { m -> m.id !in ids },
+                deletedItems = repo.getDeletedItems(),
+            )
+        }
+    }
+
+    /** Returns the list of URIs for the selected items so MainScreen can fire an ACTION_SEND_MULTIPLE. */
+    fun getUrisForIds(ids: Set<Long>): List<android.net.Uri> =
+        _uiState.value.allMedia.filter { it.id in ids }.map { it.uri }
+
+    // ── Album management ──────────────────────────────────────────────────
+
+    /** Pins or unpins an album (persisted in prefs). */
+    fun togglePinAlbum(albumId: String) {
+        val current = _uiState.value.pinnedAlbumIds.toMutableSet()
+        if (albumId in current) current.remove(albumId) else current.add(albumId)
+        val prefs = getApplication<android.app.Application>()
+            .getSharedPreferences("gallery_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putStringSet("pinned_albums", current).apply()
+        _uiState.update { it.copy(pinnedAlbumIds = current) }
+    }
+
+    private fun loadPinnedAlbums() {
+        val prefs = getApplication<android.app.Application>()
+            .getSharedPreferences("gallery_prefs", android.content.Context.MODE_PRIVATE)
+        val pinned = prefs.getStringSet("pinned_albums", emptySet()) ?: emptySet()
+        _uiState.update { it.copy(pinnedAlbumIds = pinned) }
     }
 
     fun getMediaForAlbum(albumId: String): List<MediaItem> {

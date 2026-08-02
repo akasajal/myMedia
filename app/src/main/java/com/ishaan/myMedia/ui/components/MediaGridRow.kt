@@ -11,8 +11,11 @@ import com.ishaan.myMedia.data.model.MediaItem
 fun MediaGridRow(
     items: List<MediaItem>,
     onItemClick: (MediaItem) -> Unit,
-    columns: Int = 4,             // default changed to 4
+    columns: Int = 4,
     modifier: Modifier = Modifier,
+    selectedIds: Set<Long> = emptySet(),
+    selectionActive: Boolean = false,
+    onItemLongClick: ((MediaItem) -> Unit)? = null,
 ) {
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val gap         = 2.dp
@@ -24,11 +27,15 @@ fun MediaGridRow(
     ) {
         repeat(columns) { idx ->
             if (idx < items.size) {
+                val item = items[idx]
                 MediaThumbnail(
-                    item         = items[idx],
-                    modifier     = Modifier.size(cellSize),
-                    cornerRadius = 0.dp,
-                    onClick      = { onItemClick(items[idx]) },
+                    item            = item,
+                    modifier        = Modifier.size(cellSize),
+                    cornerRadius    = 0.dp,
+                    isSelected      = item.id in selectedIds,
+                    selectionActive = selectionActive,
+                    onClick         = { onItemClick(item) },
+                    onLongClick     = { onItemLongClick?.invoke(item) },
                 )
             } else {
                 Spacer(modifier = Modifier.size(cellSize))

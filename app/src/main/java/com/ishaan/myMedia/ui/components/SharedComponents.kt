@@ -1,15 +1,24 @@
 package com.ishaan.myMedia.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Gif
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -17,46 +26,139 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.ishaan.myMedia.data.model.MediaItem
 import com.ishaan.myMedia.data.model.MediaType
 import com.ishaan.myMedia.ui.theme.PrimaryAccent
 import com.ishaan.myMedia.ui.theme.SoftPurple
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Gif
+
+// ── Shimmer brush ─────────────────────────────────────────────────────────────
+
+@Composable
+fun shimmerBrush(): Brush {
+    val shimmerColors = listOf(
+        MaterialTheme.colorScheme.surfaceVariant,
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        MaterialTheme.colorScheme.surfaceVariant,
+    )
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer_translate"
+    )
+    return Brush.linearGradient(
+        colors = shimmerColors,
+        start = Offset(translateAnim - 300f, 0f),
+        end = Offset(translateAnim, 0f),
+    )
+}
+
+// ── Media thumbnail with selection support ────────────────────────────────────
 
 @Composable
 fun MediaThumbnail(
     item: MediaItem,
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 8.dp,
+    cornerRadius: Dp = 0.dp,
+    isSelected: Boolean = false,
+    selectionActive: Boolean = false,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
+    val overlayColor by animateColorAsState(
+        targetValue = if (isSelected) Color.Black.copy(alpha = 0.35f) else Color.Transparent,
+        label = "selection_overlay"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected) PrimaryAccent else Color.Transparent,
+        label = "selection_border"
+    )
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                if (onClick != null || onLongClick != null)
+                    Modifier.combinedClickable(
+                        onClick = { onClick?.invoke() },
+                        onLongClick = { onLongClick?.invoke() },
+                    )
+                else Modifier
+            )
+            .then(
+                if (isSelected)
+                    Modifier.border(2.dp, borderColor, RoundedCornerShape(cornerRadius))
+                else Modifier
+            )
     ) {
-        AsyncImage(
+        SubcomposeAsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(item.uri)
-                // For videos, try to get a frame at 1s to avoid black start frames
                 .apply {
                     if (item.mediaType == MediaType.VIDEO) {
                         setParameter("videoFrameMicros", 1_000_000L)
                     }
                 }
                 .crossfade(true)
+                .memoryCacheKey(item.id.toString())
+                .diskCacheKey(item.id.toString())
                 .build(),
             contentDescription = item.name,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
+            loading = {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(shimmerBrush())
+                )
+            },
         )
 
+        // Selection overlay
+        if (selectionActive || isSelected) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(overlayColor)
+            )
+        }
+
+        // Checkmark badge
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .size(22.dp)
+                    .background(PrimaryAccent, CircleShape)
+            ) {
+                Icon(
+                    Icons.Rounded.CheckCircle,
+                    contentDescription = "Selected",
+                    tint = Color.White,
+                    modifier = Modifier.fillMaxSize().padding(2.dp),
+                )
+            }
+        } else if (selectionActive) {
+            // Empty circle when selection mode active but not selected
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .size(22.dp)
+                    .background(Color.Black.copy(0.3f), CircleShape)
+                    .border(1.5.dp, Color.White, CircleShape)
+            )
+        }
+
         if (item.mediaType == MediaType.VIDEO) {
-            // Gradient scrim along the bottom for better legibility of the duration badge
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -68,8 +170,6 @@ fun MediaThumbnail(
                         )
                     )
             )
-
-            // Duration badge pill — bottom-end
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -83,7 +183,7 @@ fun MediaThumbnail(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.PlayArrow,
+                        Icons.Rounded.PlayArrow,
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(12.dp)
@@ -100,7 +200,6 @@ fun MediaThumbnail(
             }
         }
 
-        // GIF badge — top-end
         if (item.mediaType == MediaType.GIF) {
             Box(
                 modifier = Modifier

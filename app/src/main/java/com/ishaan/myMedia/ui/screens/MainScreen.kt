@@ -1,25 +1,25 @@
 package com.ishaan.myMedia.ui.screens
 
+import android.content.Intent
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
-import android.content.Intent
-import androidx.activity.compose.BackHandler
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ishaan.myMedia.data.model.Album
 import com.ishaan.myMedia.data.model.MediaItem
 import com.ishaan.myMedia.ui.components.MoveCopySheet
-import com.ishaan.myMedia.ui.screens.MediaFoldersScreen
 import com.ishaan.myMedia.viewmodel.GalleryViewModel
 
 enum class NavTab { MEDIA, ALBUMS, FAVORITES, SETTINGS }
@@ -33,9 +33,6 @@ val navItems = listOf(
     NavItem(NavTab.SETTINGS,  "Settings",  Icons.Rounded.Settings),
 )
 
-/**
- * Viewer state — null means no viewer is open
- */
 data class ViewerState(
     val items: List<MediaItem>,
     val index: Int,
@@ -46,9 +43,11 @@ fun MainScreen(viewModel: GalleryViewModel) {
     val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
     var activeTab   by remember { mutableStateOf(NavTab.MEDIA) }
 
-    // Hoisted scroll state — survives viewer open/close so the gallery
-    // returns to the same position when you dismiss a media item.
+    // Hoisted scroll state — survives viewer open/close
     val mediaListState = rememberLazyListState()
+
+    // Multi-select state
+    var selection by remember { mutableStateOf(SelectionState()) }
 
     // Album detail navigation
     var activeAlbum by remember { mutableStateOf<Album?>(null) }
@@ -60,46 +59,52 @@ fun MainScreen(viewModel: GalleryViewModel) {
         val vs = viewerState ?: return@LaunchedEffect
         val newItems = uiState.allMedia
         if (newItems == vs.items) return@LaunchedEffect
-        // Remap the current index to the same item in the updated list (it may have shifted).
         val currentId = vs.items.getOrNull(vs.index)?.id
         val newIndex = if (currentId != null) newItems.indexOfFirst { it.id == currentId } else -1
         if (newIndex < 0) {
-            // Current item was removed (deleted externally); close the viewer.
             viewerState = null
         } else {
             viewerState = vs.copy(items = newItems, index = newIndex)
         }
     }
 
-    // Recycle bin navigation
-    var showRecycleBin by remember { mutableStateOf(false) }
-
-    // Media folders navigation
+    var showRecycleBin   by remember { mutableStateOf(false) }
     var showMediaFolders by remember { mutableStateOf(false) }
 
-    // Media Actions State
     var itemToDelete by remember { mutableStateOf<MediaItem?>(null) }
     var itemToMove   by remember { mutableStateOf<MediaItem?>(null) }
     var playingVideo by remember { mutableStateOf<MediaItem?>(null) }
     var editingItem  by remember { mutableStateOf<MediaItem?>(null) }
-    var saveResult   by remember { mutableStateOf<String?>(null) } // toast-like message
+    var saveResult   by remember { mutableStateOf<String?>(null) }
+
+    // Bulk action state
+    var showBulkDeleteDialog by remember { mutableStateOf(false) }
+    var showBulkMoveSheet    by remember { mutableStateOf(false) }
+
     val context = LocalContext.current
 
-    // Handle system back button
-    BackHandler(enabled = editingItem != null || itemToMove != null || playingVideo != null || viewerState != null || activeAlbum != null || showRecycleBin || showMediaFolders || activeTab != NavTab.MEDIA) {
+    // Clear selection when leaving Media tab
+    LaunchedEffect(activeTab) {
+        if (activeTab != NavTab.MEDIA) selection = SelectionState()
+    }
+
+    BackHandler(enabled = selection.isActive || editingItem != null || itemToMove != null || playingVideo != null || viewerState != null || activeAlbum != null || showRecycleBin || showMediaFolders || activeTab != NavTab.MEDIA) {
         when {
-            editingItem  != null -> editingItem = null
-            itemToMove   != null -> itemToMove = null
+            selection.isActive  -> selection = SelectionState()
+            editingItem != null -> editingItem = null
+            itemToMove  != null -> itemToMove = null
             playingVideo != null -> playingVideo = null
-            viewerState  != null -> viewerState = null
-            activeAlbum  != null -> activeAlbum = null
+            viewerState != null -> viewerState = null
+            activeAlbum != null -> activeAlbum = null
             showRecycleBin      -> showRecycleBin = false
             showMediaFolders    -> showMediaFolders = false
             activeTab != NavTab.MEDIA -> activeTab = NavTab.MEDIA
         }
     }
 
-    // Delete confirmation dialog
+    // ── Dialogs & sheets ──────────────────────────────────────────────────
+
+    // Single-item delete
     itemToDelete?.let { item ->
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
@@ -110,15 +115,10 @@ fun MainScreen(viewModel: GalleryViewModel) {
                     onClick = {
                         viewModel.deleteMedia(item)
                         itemToDelete = null
-                        if (viewerState != null) {
-                            // Close viewer after deletion
-                            viewerState = null
-                        }
+                        if (viewerState != null) viewerState = null
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Move to Bin")
-                }
+                ) { Text("Move to Bin") }
             },
             dismissButton = {
                 TextButton(onClick = { itemToDelete = null }) { Text("Cancel") }
@@ -126,15 +126,63 @@ fun MainScreen(viewModel: GalleryViewModel) {
         )
     }
 
-    // Move/Copy bottom sheet
+    // Bulk delete confirmation
+    if (showBulkDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showBulkDeleteDialog = false },
+            title = { Text("Move ${selection.count} items to Recycle Bin?") },
+            text = { Text("They will be permanently deleted after 30 days.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteMediaBulk(selection.selectedIds)
+                        selection = SelectionState()
+                        showBulkDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Move to Bin") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBulkDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Single-item move/copy sheet
     if (itemToMove != null) {
         MoveCopySheet(
-            item    = itemToMove!!,
-            albums  = uiState.albums,
+            item      = itemToMove!!,
+            albums    = uiState.albums,
             onDismiss = { itemToMove = null },
-            onMove  = { dest -> viewModel.moveMedia(itemToMove!!, dest) },
-            onCopy  = { dest -> viewModel.copyMedia(itemToMove!!, dest) }
+            onMove    = { dest -> viewModel.moveMedia(itemToMove!!, dest) },
+            onCopy    = { dest -> viewModel.copyMedia(itemToMove!!, dest) }
         )
+    }
+
+    // Bulk move sheet — reuse MoveCopySheet with a proxy item for the label
+    if (showBulkMoveSheet) {
+        val proxyItem = uiState.allMedia.firstOrNull { it.id in selection.selectedIds }
+        if (proxyItem != null) {
+            MoveCopySheet(
+                item      = proxyItem.copy(name = "${selection.count} items"),
+                albums    = uiState.albums,
+                onDismiss = { showBulkMoveSheet = false },
+                onMove    = { dest ->
+                    selection.selectedIds.forEach { id ->
+                        uiState.allMedia.firstOrNull { it.id == id }?.let { viewModel.moveMedia(it, dest) }
+                    }
+                    selection = SelectionState()
+                    showBulkMoveSheet = false
+                },
+                onCopy    = { dest ->
+                    selection.selectedIds.forEach { id ->
+                        uiState.allMedia.firstOrNull { it.id == id }?.let { viewModel.copyMedia(it, dest) }
+                    }
+                    selection = SelectionState()
+                    showBulkMoveSheet = false
+                },
+            )
+        }
     }
 
     // Save result snackbar
@@ -144,18 +192,15 @@ fun MainScreen(viewModel: GalleryViewModel) {
             saveResult = null
         }
         Box(
-            Modifier
-                .fillMaxSize()
-                .padding(bottom = 80.dp),
+            Modifier.fillMaxSize().padding(bottom = 80.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
-            Snackbar(modifier = Modifier.padding(16.dp)) {
-                Text(msg)
-            }
+            Snackbar(modifier = Modifier.padding(16.dp)) { Text(msg) }
         }
     }
 
-    // If editor is open, show it full-screen
+    // ── Full-screen overlays (return early) ───────────────────────────────
+
     editingItem?.let { item ->
         ImageEditorScreen(
             item   = item,
@@ -170,7 +215,6 @@ fun MainScreen(viewModel: GalleryViewModel) {
         return
     }
 
-    // If viewer is open, show it full-screen
     viewerState?.let { vs ->
         if (playingVideo != null) {
             VideoPlayerScreen(
@@ -186,15 +230,14 @@ fun MainScreen(viewModel: GalleryViewModel) {
             onBack        = { viewerState = null },
             onToggleFavorite = { item ->
                 viewModel.toggleFavorite(item)
-                // Reflect favorite change in viewer list
                 viewerState = vs.copy(
                     items = vs.items.map {
                         if (it.id == item.id) it.copy(isFavorite = !it.isFavorite) else it
                     }
                 )
             },
-            onDelete = { item -> itemToDelete = item },
-            onShare  = { item ->
+            onDelete     = { item -> itemToDelete = item },
+            onShare      = { item ->
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = item.mimeType
                     putExtra(Intent.EXTRA_STREAM, item.uri)
@@ -203,13 +246,12 @@ fun MainScreen(viewModel: GalleryViewModel) {
                 context.startActivity(Intent.createChooser(shareIntent, "Share with"))
             },
             onPlayVideo = { item -> playingVideo = item },
-            onMove = { item -> itemToMove = item },
-            onEdit = { item -> editingItem = item },
+            onMove      = { item -> itemToMove = item },
+            onEdit      = { item -> editingItem = item },
         )
         return
     }
 
-    // Album detail
     activeAlbum?.let { album ->
         val groups = viewModel.getGroupsForAlbum(album.id)
         AlbumDetailScreen(
@@ -226,7 +268,6 @@ fun MainScreen(viewModel: GalleryViewModel) {
         return
     }
 
-    // Recycle bin screen
     if (showRecycleBin) {
         RecycleBinScreen(
             deletedItems        = uiState.deletedItems,
@@ -237,7 +278,6 @@ fun MainScreen(viewModel: GalleryViewModel) {
         return
     }
 
-    // Media folders screen
     if (showMediaFolders) {
         MediaFoldersScreen(
             folderTree         = uiState.folderTree,
@@ -249,11 +289,17 @@ fun MainScreen(viewModel: GalleryViewModel) {
         return
     }
 
+    // ── Main scaffold ─────────────────────────────────────────────────────
+
     Scaffold(
         bottomBar = {
-            GalleryNavBar(
-                activeTab = activeTab,
-            ) { activeTab = it }
+            AnimatedVisibility(
+                visible = !selection.isActive,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit  = slideOutVertically(targetOffsetY = { it }),
+            ) {
+                GalleryNavBar(activeTab = activeTab) { activeTab = it }
+            }
         },
         contentWindowInsets = WindowInsets.systemBars,
     ) { innerPadding ->
@@ -262,7 +308,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Header with Page title and Sort action
+            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -272,10 +318,10 @@ fun MainScreen(viewModel: GalleryViewModel) {
             ) {
                 Text(
                     text = when (activeTab) {
-                        NavTab.MEDIA -> "Media"
-                        NavTab.ALBUMS -> "Albums"
+                        NavTab.MEDIA     -> "Media"
+                        NavTab.ALBUMS    -> "Albums"
                         NavTab.FAVORITES -> "Favorites"
-                        NavTab.SETTINGS -> "Settings"
+                        NavTab.SETTINGS  -> "Settings"
                     },
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -283,7 +329,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
 
                 if (activeTab == NavTab.MEDIA || activeTab == NavTab.FAVORITES) {
                     SortMenu(
-                        currentOrder = uiState.sortOrder,
+                        currentOrder  = uiState.sortOrder,
                         onOrderChange = viewModel::updateSortOrder
                     )
                 }
@@ -299,10 +345,31 @@ fun MainScreen(viewModel: GalleryViewModel) {
                     columns         = uiState.gridColumns,
                     onColumnsChange = viewModel::updateGridColumns,
                     listState       = mediaListState,
+                    selection       = selection,
+                    onSelectionChange = { selection = it },
+                    onBulkDelete    = { showBulkDeleteDialog = true },
+                    onBulkShare     = {
+                        val uris = viewModel.getUrisForIds(selection.selectedIds)
+                        if (uris.isNotEmpty()) {
+                            val mimeType = if (uris.size == 1)
+                                uiState.allMedia.firstOrNull { it.id in selection.selectedIds }?.mimeType ?: "*/*"
+                            else "*/*"
+                            val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                                type = mimeType
+                                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share ${uris.size} items"))
+                            selection = SelectionState()
+                        }
+                    },
+                    onBulkMove      = { showBulkMoveSheet = true },
                 )
                 NavTab.ALBUMS -> AlbumsScreen(
-                    uiState      = uiState,
-                    onAlbumClick = { activeAlbum = it },
+                    uiState         = uiState,
+                    onAlbumClick    = { activeAlbum = it },
+                    pinnedAlbumIds  = uiState.pinnedAlbumIds,
+                    onTogglePin     = { viewModel.togglePinAlbum(it.id) },
                 )
                 NavTab.FAVORITES -> FavoritesScreen(
                     uiState         = uiState,
