@@ -2,6 +2,7 @@ package com.ishaan.myMedia.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -61,6 +62,7 @@ fun shimmerBrush(): Brush {
 
 // ── Media thumbnail with selection support ────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaThumbnail(
     item: MediaItem,

@@ -3,6 +3,7 @@ package com.ishaan.myMedia.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -177,6 +178,7 @@ private fun AlbumSortBar(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AlbumCard(
     album: Album,
