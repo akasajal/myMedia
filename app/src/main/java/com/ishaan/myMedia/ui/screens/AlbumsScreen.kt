@@ -1,25 +1,35 @@
 package com.ishaan.myMedia.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -275,8 +285,6 @@ private fun CreateAlbumDialog(
     )
 }
 
-// ── Album detail (date-grouped grid) ─────────────────────────────────────────
-
 @Composable
 fun AlbumDetailScreen(
     album: Album,
@@ -285,55 +293,230 @@ fun AlbumDetailScreen(
     onMediaClick: (MediaItem, List<MediaItem>, Int) -> Unit,
     columns: Int,
     onColumnsChange: (Int) -> Unit,
+    selection: SelectionState = SelectionState(),
+    onSelectionChange: (SelectionState) -> Unit = {},
+    onBulkDelete: () -> Unit = {},
+    onBulkShare: () -> Unit = {},
+    onBulkMove: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
     val flatItems = groups.flatMap { it.items }
 
-    Column(modifier.fillMaxSize()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBack,
-                    "Back",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
+    data class RowEntry(val startFlatIndex: Int, val count: Int)
+
+    val lazyRowEntries: List<RowEntry?> = remember(groups, columns) {
+        val result = mutableListOf<RowEntry?>()
+        var flatIdx = 0
+        groups.forEach { group ->
+            result.add(null)
+            group.items.chunked(columns).forEach { row ->
+                result.add(RowEntry(flatIdx, row.size))
+                flatIdx += row.size
             }
-            Text(
-                text  = album.name,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
         }
+        result
+    }
 
-        if (groups.isEmpty()) {
-            EmptyState("No media in this album.")
-            return@Column
-        }
+    var dragSelect by remember { mutableStateOf(DragSelectState()) }
+    var preSelectionIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    val screenWidthPx = remember { mutableFloatStateOf(0f) }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .pinchToAdjustColumns(columns, onColumnsChange),
-            contentPadding = PaddingValues(bottom = 80.dp),
-        ) {
-            groups.forEach { group ->
-                item(key = "header_${group.label}") { DateGroupHeader(group.label) }
-                val rows = group.items.chunked(columns)
-                itemsIndexed(rows, key = { i, _ -> "row_${group.label}_$i" }) { _, row ->
-                    MediaGridRow(
-                        items   = row,
-                        columns = columns,
-                        onItemClick = { item ->
-                            val idx = flatItems.indexOfFirst { it.id == item.id }
-                            onMediaClick(item, flatItems, idx.coerceAtLeast(0))
-                        },
+    fun yToFlatIndex(y: Float, pointerX: Float): Int {
+        val info = listState.layoutInfo
+        val viewportStart = info.viewportStartOffset
+        val rowListIdx = info.visibleItemsInfo.firstOrNull { visItem ->
+            val top = visItem.offset - viewportStart
+            y >= top && y < top + visItem.size
+        }?.index ?: return -1
+        if (rowListIdx >= lazyRowEntries.size) return -1
+        val entry = lazyRowEntries[rowListIdx] ?: return -1
+        val col = (pointerX / (screenWidthPx.floatValue / columns)).toInt().coerceIn(0, columns - 1)
+        val flatIdx = entry.startFlatIndex + col
+        return if (flatIdx < flatItems.size) flatIdx else flatItems.size - 1
+    }
+
+    LaunchedEffect(dragSelect, preSelectionIds) {
+        if (!dragSelect.isActive) return@LaunchedEffect
+        val rangeIds = dragSelect.selectedRange().map { flatItems[it].id }.toSet()
+        onSelectionChange(SelectionState(preSelectionIds + rangeIds))
+    }
+
+    BackHandler(enabled = selection.isActive) {
+        onSelectionChange(SelectionState())
+    }
+
+    Box(
+        modifier
+            .fillMaxSize()
+            .onGloballyPositioned { screenWidthPx.floatValue = it.size.width.toFloat() }
+    ) {
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                IconButton(onClick = {
+                    if (selection.isActive) onSelectionChange(SelectionState()) else onBack()
+                }) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        "Back",
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
+                Text(
+                    text  = album.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            if (groups.isEmpty()) {
+                EmptyState("No media in this album.")
+                return@Column
+            }
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pinchToAdjustColumns(columns, onColumnsChange)
+                    .pointerInput(selection.isActive, columns, flatItems) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            var currentPos = down.position
+                            val longPressTimeout = viewConfiguration.longPressTimeoutMillis
+                            var longPressTriggered = false
+                            val downTime = System.currentTimeMillis()
+
+                            do {
+                                val event = awaitPointerEvent()
+                                val elapsed = System.currentTimeMillis() - downTime
+                                val change = event.changes.firstOrNull() ?: break
+
+                                if (!longPressTriggered && elapsed >= longPressTimeout) {
+                                    longPressTriggered = true
+                                    val anchorFlat = yToFlatIndex(down.position.y, down.position.x)
+                                    if (anchorFlat >= 0) {
+                                        preSelectionIds = selection.selectedIds
+                                        dragSelect = DragSelectState(anchorFlat, anchorFlat)
+                                        change.consume()
+                                    }
+                                }
+
+                                if (longPressTriggered && dragSelect.isActive) {
+                                    currentPos = change.position
+                                    val newFlat = yToFlatIndex(currentPos.y, currentPos.x)
+                                    if (newFlat >= 0 && newFlat != dragSelect.currentIndex) {
+                                        dragSelect = dragSelect.copy(currentIndex = newFlat)
+                                    }
+                                    change.consume()
+                                    val topEdge = 80f
+                                    val bottomEdge = size.height - 80f
+                                    when {
+                                        currentPos.y < topEdge -> scope.launch { listState.scrollBy(-18f) }
+                                        currentPos.y > bottomEdge -> scope.launch { listState.scrollBy(18f) }
+                                    }
+                                }
+                            } while (event.changes.any { it.pressed })
+
+                            dragSelect = DragSelectState()
+                        }
+                    },
+                contentPadding = PaddingValues(bottom = 80.dp),
+            ) {
+                groups.forEach { group ->
+                    item(key = "header_${group.label}") { DateGroupHeader(group.label) }
+                    val rows = group.items.chunked(columns)
+                    itemsIndexed(rows, key = { i, _ -> "row_${group.label}_$i" }) { _, row ->
+                        MediaGridRow(
+                            items           = row,
+                            columns         = columns,
+                            selectedIds     = selection.selectedIds,
+                            selectionActive = selection.isActive,
+                            onItemClick = { item ->
+                                if (selection.isActive) {
+                                    onSelectionChange(selection.toggle(item.id))
+                                } else {
+                                    val idx = flatItems.indexOfFirst { it.id == item.id }
+                                    onMediaClick(item, flatItems, idx.coerceAtLeast(0))
+                                }
+                            },
+                            onItemLongClick = { item ->
+                                onSelectionChange(selection.toggle(item.id))
+                            },
+                        )
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible  = selection.isActive,
+            enter    = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+            exit     = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            AlbumSelectionToolbar(
+                count       = selection.count,
+                allSelected = selection.count == flatItems.size,
+                onClose     = { onSelectionChange(SelectionState()) },
+                onSelectAll = { onSelectionChange(selection.selectAll(flatItems.map { it.id })) },
+                onShare     = onBulkShare,
+                onMove      = onBulkMove,
+                onDelete    = onBulkDelete,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AlbumSelectionToolbar(
+    count: Int,
+    allSelected: Boolean,
+    onClose: () -> Unit,
+    onSelectAll: () -> Unit,
+    onShare: () -> Unit,
+    onMove: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Surface(
+        tonalElevation  = 4.dp,
+        shadowElevation = 4.dp,
+        modifier        = Modifier.fillMaxWidth().statusBarsPadding(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(Icons.Rounded.Close, "Cancel selection")
+            }
+            Text(
+                "$count selected",
+                style    = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onSelectAll) {
+                Icon(
+                    if (allSelected) Icons.Rounded.Deselect else Icons.Rounded.SelectAll,
+                    if (allSelected) "Deselect all" else "Select all",
+                )
+            }
+            IconButton(onClick = onShare, enabled = count > 0) {
+                Icon(Icons.Rounded.Share, "Share")
+            }
+            IconButton(onClick = onMove, enabled = count > 0) {
+                Icon(Icons.Rounded.DriveFileMove, "Move")
+            }
+            IconButton(onClick = onDelete, enabled = count > 0) {
+                Icon(Icons.Rounded.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
             }
         }
     }

@@ -46,10 +46,9 @@ fun MainScreen(viewModel: GalleryViewModel) {
     // Hoisted scroll state — survives viewer open/close
     val mediaListState = rememberLazyListState()
 
-    // Multi-select state
     var selection by remember { mutableStateOf(SelectionState()) }
+    var albumSelection by remember { mutableStateOf(SelectionState()) }
 
-    // Album detail navigation
     var activeAlbum by remember { mutableStateOf<Album?>(null) }
 
     // Viewer
@@ -83,13 +82,17 @@ fun MainScreen(viewModel: GalleryViewModel) {
 
     val context = LocalContext.current
 
-    // Clear selection when leaving Media tab
     LaunchedEffect(activeTab) {
         if (activeTab != NavTab.MEDIA) selection = SelectionState()
     }
 
-    BackHandler(enabled = selection.isActive || editingItem != null || itemToMove != null || playingVideo != null || viewerState != null || activeAlbum != null || showRecycleBin || showMediaFolders || activeTab != NavTab.MEDIA) {
+    LaunchedEffect(activeAlbum) {
+        if (activeAlbum == null) albumSelection = SelectionState()
+    }
+
+    BackHandler(enabled = selection.isActive || albumSelection.isActive || editingItem != null || itemToMove != null || playingVideo != null || viewerState != null || activeAlbum != null || showRecycleBin || showMediaFolders || activeTab != NavTab.MEDIA) {
         when {
+            albumSelection.isActive -> albumSelection = SelectionState()
             selection.isActive  -> selection = SelectionState()
             editingItem != null -> editingItem = null
             itemToMove  != null -> itemToMove = null
@@ -124,6 +127,55 @@ fun MainScreen(viewModel: GalleryViewModel) {
                 TextButton(onClick = { itemToDelete = null }) { Text("Cancel") }
             }
         )
+    }
+
+    var showAlbumBulkDeleteDialog by remember { mutableStateOf(false) }
+    var showAlbumBulkMoveSheet    by remember { mutableStateOf(false) }
+
+    if (showAlbumBulkDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showAlbumBulkDeleteDialog = false },
+            title = { Text("Move \${albumSelection.count} items to Recycle Bin?") },
+            text = { Text("They will be permanently deleted after 30 days.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteMediaBulk(albumSelection.selectedIds)
+                        albumSelection = SelectionState()
+                        showAlbumBulkDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Move to Bin") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAlbumBulkDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showAlbumBulkMoveSheet) {
+        val proxyItem = uiState.allMedia.firstOrNull { it.id in albumSelection.selectedIds }
+        if (proxyItem != null) {
+            MoveCopySheet(
+                item      = proxyItem.copy(name = "\${albumSelection.count} items"),
+                albums    = uiState.albums,
+                onDismiss = { showAlbumBulkMoveSheet = false },
+                onMove    = { dest ->
+                    albumSelection.selectedIds.forEach { id ->
+                        uiState.allMedia.firstOrNull { it.id == id }?.let { viewModel.moveMedia(it, dest) }
+                    }
+                    albumSelection = SelectionState()
+                    showAlbumBulkMoveSheet = false
+                },
+                onCopy    = { dest ->
+                    albumSelection.selectedIds.forEach { id ->
+                        uiState.allMedia.firstOrNull { it.id == id }?.let { viewModel.copyMedia(it, dest) }
+                    }
+                    albumSelection = SelectionState()
+                    showAlbumBulkMoveSheet = false
+                },
+            )
+        }
     }
 
     // Bulk delete confirmation
@@ -255,15 +307,34 @@ fun MainScreen(viewModel: GalleryViewModel) {
     activeAlbum?.let { album ->
         val groups = viewModel.getGroupsForAlbum(album.id)
         AlbumDetailScreen(
-            album           = album,
-            groups          = groups,
-            onBack          = { activeAlbum = null },
-            onMediaClick    = { item, items, idx ->
+            album             = album,
+            groups            = groups,
+            onBack            = { activeAlbum = null },
+            onMediaClick      = { item, items, idx ->
                 viewModel.loadMetadataFor(item)
                 viewerState = ViewerState(items, idx)
             },
-            columns         = uiState.gridColumns,
-            onColumnsChange = viewModel::updateGridColumns,
+            columns           = uiState.gridColumns,
+            onColumnsChange   = viewModel::updateGridColumns,
+            selection         = albumSelection,
+            onSelectionChange = { albumSelection = it },
+            onBulkDelete      = { showAlbumBulkDeleteDialog = true },
+            onBulkShare       = {
+                val uris = viewModel.getUrisForIds(albumSelection.selectedIds)
+                if (uris.isNotEmpty()) {
+                    val mimeType = if (uris.size == 1)
+                        uiState.allMedia.firstOrNull { it.id in albumSelection.selectedIds }?.mimeType ?: "*/*"
+                    else "*/*"
+                    val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                        type = mimeType
+                        putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, "Share \${uris.size} items"))
+                    albumSelection = SelectionState()
+                }
+            },
+            onBulkMove        = { showAlbumBulkMoveSheet = true },
         )
         return
     }
