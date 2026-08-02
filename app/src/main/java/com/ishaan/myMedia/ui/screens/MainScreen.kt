@@ -1,5 +1,7 @@
 package com.ishaan.myMedia.ui.screens
 
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -43,6 +45,10 @@ data class ViewerState(
 fun MainScreen(viewModel: GalleryViewModel) {
     val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
     var activeTab   by remember { mutableStateOf(NavTab.MEDIA) }
+
+    // Hoisted scroll state — survives viewer open/close so the gallery
+    // returns to the same position when you dismiss a media item.
+    val mediaListState = rememberLazyListState()
 
     // Album detail navigation
     var activeAlbum by remember { mutableStateOf<Album?>(null) }
@@ -292,6 +298,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
                     },
                     columns         = uiState.gridColumns,
                     onColumnsChange = viewModel::updateGridColumns,
+                    listState       = mediaListState,
                 )
                 NavTab.ALBUMS -> AlbumsScreen(
                     uiState      = uiState,
