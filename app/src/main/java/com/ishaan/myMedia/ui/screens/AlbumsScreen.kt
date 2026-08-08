@@ -5,7 +5,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -22,7 +21,6 @@ import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,7 +28,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,12 +68,11 @@ fun AlbumsScreen(
         return
     }
 
-    // Sort albums, pinned always first
     val sorted = remember(uiState.albums, sortOrder, pinnedAlbumIds) {
         val comparator: Comparator<Album> = when (sortOrder) {
             AlbumSortOrder.NAME_ASC         -> compareBy { it.name.lowercase() }
             AlbumSortOrder.ITEM_COUNT_DESC  -> compareByDescending { it.mediaCount }
-            AlbumSortOrder.DATE_RECENT      -> compareByDescending { it.mediaCount } // proxy; real date needs repo
+            AlbumSortOrder.DATE_RECENT      -> compareByDescending { it.mediaCount }
         }
         val pinned   = uiState.albums.filter { it.id in pinnedAlbumIds }.sortedWith(comparator)
         val unpinned = uiState.albums.filter { it.id !in pinnedAlbumIds }.sortedWith(comparator)
@@ -85,9 +81,8 @@ fun AlbumsScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            // Sort bar
             AlbumSortBar(
-                current = sortOrder,
+                current  = sortOrder,
                 onChange = { sortOrder = it },
             )
             LazyVerticalGrid(
@@ -100,9 +95,9 @@ fun AlbumsScreen(
                 items(sorted.size, key = { sorted[it].id }) { idx ->
                     val album = sorted[idx]
                     AlbumCard(
-                        album    = album,
-                        isPinned = album.id in pinnedAlbumIds,
-                        onClick  = { onAlbumClick(album) },
+                        album       = album,
+                        isPinned    = album.id in pinnedAlbumIds,
+                        onClick     = { onAlbumClick(album) },
                         onLongClick = { onTogglePin(album) },
                     )
                 }
@@ -110,11 +105,11 @@ fun AlbumsScreen(
         }
 
         FloatingActionButton(
-            onClick = { showCreateDialog = true },
+            onClick        = { showCreateDialog = true },
             containerColor = PrimaryAccent,
-            modifier = Modifier
+            modifier       = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp)
+                .padding(16.dp),
         ) {
             Icon(Icons.Rounded.CreateNewFolder, "Create album", tint = Color.White)
         }
@@ -150,9 +145,7 @@ private fun AlbumSortBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box {
-            TextButton(
-                onClick = { expanded = true },
-            ) {
+            TextButton(onClick = { expanded = true }) {
                 Icon(Icons.Rounded.Sort, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(label, style = MaterialTheme.typography.labelLarge)
@@ -227,9 +220,9 @@ fun AlbumCard(
         ) {
             Column {
                 Text(
-                    text  = album.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
+                    text     = album.name,
+                    style    = MaterialTheme.typography.titleSmall,
+                    color    = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -241,12 +234,11 @@ fun AlbumCard(
             }
         }
 
-        // Pin icon — top-end corner
         Icon(
-            imageVector = if (isPinned) Icons.Rounded.PushPin else Icons.Rounded.PushPin,
+            imageVector        = Icons.Rounded.PushPin,
             contentDescription = if (isPinned) "Pinned" else "Long-press to pin",
-            tint = pinTint,
-            modifier = Modifier
+            tint               = pinTint,
+            modifier           = Modifier
                 .align(Alignment.TopEnd)
                 .padding(8.dp)
                 .size(18.dp),
@@ -267,10 +259,10 @@ private fun CreateAlbumDialog(
         title = { Text("New Album") },
         text = {
             OutlinedTextField(
-                value = name,
+                value         = name,
                 onValueChange = { name = it },
-                label = { Text("Album name") },
-                singleLine = true,
+                label         = { Text("Album name") },
+                singleLine    = true,
             )
         },
         confirmButton = {
@@ -304,54 +296,11 @@ fun AlbumDetailScreen(
     val listState = rememberLazyListState()
     val flatItems = groups.flatMap { it.items }
 
-    data class RowEntry(val startFlatIndex: Int, val count: Int)
-
-    val lazyRowEntries: List<RowEntry?> = remember(groups, columns) {
-        val result = mutableListOf<RowEntry?>()
-        var flatIdx = 0
-        groups.forEach { group ->
-            result.add(null)
-            group.items.chunked(columns).forEach { row ->
-                result.add(RowEntry(flatIdx, row.size))
-                flatIdx += row.size
-            }
-        }
-        result
-    }
-
-    var dragSelect by remember { mutableStateOf(DragSelectState()) }
-    var preSelectionIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    val screenWidthPx = remember { mutableFloatStateOf(0f) }
-
-    fun yToFlatIndex(y: Float, pointerX: Float): Int {
-        val info = listState.layoutInfo
-        val viewportStart = info.viewportStartOffset
-        val rowListIdx = info.visibleItemsInfo.firstOrNull { visItem ->
-            val top = visItem.offset - viewportStart
-            y >= top && y < top + visItem.size
-        }?.index ?: return -1
-        if (rowListIdx >= lazyRowEntries.size) return -1
-        val entry = lazyRowEntries[rowListIdx] ?: return -1
-        val col = (pointerX / (screenWidthPx.floatValue / columns)).toInt().coerceIn(0, columns - 1)
-        val flatIdx = entry.startFlatIndex + col
-        return if (flatIdx < flatItems.size) flatIdx else flatItems.size - 1
-    }
-
-    LaunchedEffect(dragSelect, preSelectionIds) {
-        if (!dragSelect.isActive) return@LaunchedEffect
-        val rangeIds = dragSelect.selectedRange().map { flatItems[it].id }.toSet()
-        onSelectionChange(SelectionState(preSelectionIds + rangeIds))
-    }
-
     BackHandler(enabled = selection.isActive) {
         onSelectionChange(SelectionState())
     }
 
-    Box(
-        modifier
-            .fillMaxSize()
-            .onGloballyPositioned { screenWidthPx.floatValue = it.size.width.toFloat() }
-    ) {
+    Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -384,49 +333,7 @@ fun AlbumDetailScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .pinchToAdjustColumns(columns, onColumnsChange)
-                    .pointerInput(selection.isActive, columns, flatItems) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            var currentPos = down.position
-                            val longPressTimeout = viewConfiguration.longPressTimeoutMillis
-                            var longPressTriggered = false
-                            val downTime = System.currentTimeMillis()
-
-                            do {
-                                val event = awaitPointerEvent()
-                                val elapsed = System.currentTimeMillis() - downTime
-                                val change = event.changes.firstOrNull() ?: break
-
-                                if (!longPressTriggered && elapsed >= longPressTimeout) {
-                                    longPressTriggered = true
-                                    val anchorFlat = yToFlatIndex(down.position.y, down.position.x)
-                                    if (anchorFlat >= 0) {
-                                        preSelectionIds = selection.selectedIds
-                                        dragSelect = DragSelectState(anchorFlat, anchorFlat)
-                                        change.consume()
-                                    }
-                                }
-
-                                if (longPressTriggered && dragSelect.isActive) {
-                                    currentPos = change.position
-                                    val newFlat = yToFlatIndex(currentPos.y, currentPos.x)
-                                    if (newFlat >= 0 && newFlat != dragSelect.currentIndex) {
-                                        dragSelect = dragSelect.copy(currentIndex = newFlat)
-                                    }
-                                    change.consume()
-                                    val topEdge = 80f
-                                    val bottomEdge = size.height - 80f
-                                    when {
-                                        currentPos.y < topEdge -> scope.launch { listState.scrollBy(-18f) }
-                                        currentPos.y > bottomEdge -> scope.launch { listState.scrollBy(18f) }
-                                    }
-                                }
-                            } while (event.changes.any { it.pressed })
-
-                            dragSelect = DragSelectState()
-                        }
-                    },
+                    .pinchToAdjustColumns(columns, onColumnsChange),
                 contentPadding = PaddingValues(bottom = 80.dp),
             ) {
                 groups.forEach { group ->

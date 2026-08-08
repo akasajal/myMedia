@@ -141,7 +141,10 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     fun addFolder(treeUri: Uri) {
         repo.addSafUri(treeUri)
         refreshFolders()
-        loadMedia()
+        viewModelScope.launch {
+            repo.refreshSafMedia()  // populate the SAF cache for the new folder first
+            loadMedia()             // then load — cache is warm, media appears immediately
+        }
     }
 
     fun removeChosenFolder(displayPath: String) {

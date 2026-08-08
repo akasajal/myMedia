@@ -3,7 +3,6 @@ package com.ishaan.myMedia.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,7 +38,6 @@ fun MediaFoldersScreen(
         }
     }
 
-    // Top-level folders are collapsed by default; user taps the chevron to expand
     val expandedRoots = remember { mutableStateSetOf<String>() }
 
     Scaffold(
@@ -110,10 +108,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.folderTreeItems(
     expandedRoots: SnapshotStateSet<String>,
 ) {
     val isRoot = depth == 0
-    val hasChildren = node.subFolders.isNotEmpty()
-    val isExpanded = expandedRoots.contains(node.path)
 
     item(key = node.path) {
+        val hasChildren = node.subFolders.isNotEmpty()
+        val isExpanded = expandedRoots.contains(node.path)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -179,7 +177,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.folderTreeItems(
     }
 
     // Subfolders only rendered when the root is expanded
-    if (!isRoot || isExpanded) {
+    if (!isRoot || expandedRoots.contains(node.path)) {
         node.subFolders.forEach { subNode ->
             folderTreeItems(subNode, depth + 1, onToggleVisibility, onRemoveRoot, expandedRoots)
         }
