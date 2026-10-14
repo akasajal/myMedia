@@ -455,6 +455,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
                     onBulkMove      = { showBulkMoveSheet = true },
                 )
                 NavTab.ALBUMS -> AlbumsScreen(
+                    onCreateAlbum = viewModel::createAlbum,
                     gridState       = albumsGridState,
                     uiState         = uiState,
                     onAlbumClick    = { activeAlbum = it },

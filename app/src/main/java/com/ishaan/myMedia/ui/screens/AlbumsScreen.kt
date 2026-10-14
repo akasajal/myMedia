@@ -50,7 +50,7 @@ enum class AlbumSortOrder { NAME_ASC, ITEM_COUNT_DESC, DATE_RECENT }
 fun AlbumsScreen(
     uiState: GalleryUiState,
     onAlbumClick: (Album) -> Unit,
-    onCreateAlbum: (String) -> Unit = {},
+    onCreateAlbum: (String, Album) -> Unit,
     pinnedAlbumIds: Set<String> = emptySet(),
     onTogglePin: (Album) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -75,7 +75,7 @@ fun AlbumsScreen(
         val comparator: Comparator<Album> = when (sortOrder) {
             AlbumSortOrder.NAME_ASC         -> compareBy { it.name.lowercase() }
             AlbumSortOrder.ITEM_COUNT_DESC  -> compareByDescending { it.mediaCount }
-            AlbumSortOrder.DATE_RECENT      -> compareByDescending { it.mediaCount }
+            AlbumSortOrder.DATE_RECENT      -> compareByDescending { it.mostRecentDate }
         }
         val pinned   = uiState.albums.filter { it.id in pinnedAlbumIds }.sortedWith(comparator)
         val unpinned = uiState.albums.filter { it.id !in pinnedAlbumIds }.sortedWith(comparator)
@@ -121,9 +121,10 @@ fun AlbumsScreen(
 
     if (showCreateDialog) {
         CreateAlbumDialog(
+            parents = uiState.destinationAlbums,
             onDismiss = { showCreateDialog = false },
-            onCreate  = { name ->
-                onCreateAlbum(name)
+            onCreate  = { name, parent ->
+                onCreateAlbum(name, parent)
                 showCreateDialog = false
             },
         )
@@ -252,27 +253,46 @@ fun AlbumCard(
 
 @Composable
 private fun CreateAlbumDialog(
+    parents: List<Album>,
     onDismiss: () -> Unit,
-    onCreate: (String) -> Unit,
+    onCreate: (String, Album) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     val trimmed = name.trim()
+    var parentId by remember { mutableStateOf(parents.firstOrNull()?.id) }
+    val parent = parents.firstOrNull { it.id == parentId }
+    var expanded by remember { mutableStateOf(false) }
+    val validName = trimmed.isNotEmpty() && trimmed !in setOf(".", "..") && '/' !in trimmed && '\\' !in trimmed
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("New Album") },
         text = {
+            Column {
             OutlinedTextField(
                 value         = name,
                 onValueChange = { name = it },
                 label         = { Text("Album name") },
                 singleLine    = true,
             )
+            Text("Create in", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp))
+            Box {
+                TextButton(onClick = { expanded = true }, enabled = parents.isNotEmpty()) {
+                    Text(parent?.id ?: "Add a folder in Settings first")
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    parents.forEach { destination -> DropdownMenuItem(
+                        text = { Text(destination.id) },
+                        onClick = { parentId = destination.id; expanded = false },
+                    ) }
+                }
+            }
+            }
         },
         confirmButton = {
             TextButton(
-                onClick = { if (trimmed.isNotEmpty()) onCreate(trimmed) },
-                enabled = trimmed.isNotEmpty(),
+                onClick = { parent?.let { onCreate(trimmed, it) } },
+                enabled = validName && parent != null,
             ) { Text("Create") }
         },
         dismissButton = {

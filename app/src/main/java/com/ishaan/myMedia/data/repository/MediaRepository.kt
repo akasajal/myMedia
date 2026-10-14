@@ -477,6 +477,7 @@ class MediaRepository(private val context: Context) {
                 if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
                     val subAlbumPath = if (albumPath.isEmpty()) name else "$albumPath/$name"
                     addDiscoveredFolder(subAlbumPath)
+                    prefs.edit().putString("folder_uri_$subAlbumPath", uri.toString()).apply()
                     recursiveScanSafOptimized(uri, treeUri, subAlbumPath, result)
                 } else if (mime.startsWith("image/") || mime.startsWith("video/")) {
                     // use 64-bit hash to avoid collisions from 32-bit hashCode()
@@ -609,8 +610,12 @@ class MediaRepository(private val context: Context) {
 
     // ── Album building ────────────────────────────────────────────────────
     suspend fun buildAlbums(allMedia: List<MediaItem>): List<Album> = withContext(Dispatchers.IO) {
-        allMedia.groupBy { it.albumId }
-            .map { (albumId, items) ->
+        val grouped = allMedia.groupBy { it.albumId }
+        val roots = getChosenFolders()
+        (grouped.keys + getAllDiscoveredFolders() + roots)
+            .filter { path -> isFolderVisible(path) && roots.any { path == it || path.startsWith("${it.trimEnd('/')}/") } }
+            .map { albumId ->
+                val items = grouped[albumId].orEmpty()
                 val folderName = albumId.substringAfterLast('/')
                 val displayName = if (folderName.isEmpty()) "Root"
                 else folderName.removePrefix(".").replaceFirstChar { it.uppercase() }
@@ -619,13 +624,15 @@ class MediaRepository(private val context: Context) {
                     name       = displayName,
                     coverUri   = items.firstOrNull()?.uri,
                     mediaCount = items.size,
-                    folderUri  = folderUriForPath(albumId)
+                    folderUri  = folderUriForPath(albumId),
+                    mostRecentDate = items.maxOfOrNull { it.dateTaken } ?: 0L,
                 )
             }
             .sortedBy { it.name }
     }
 
     fun folderUriForPath(path: String): Uri? {
+        prefs.getString("folder_uri_$path", null)?.let { return Uri.parse(it) }
         getSafCache().firstOrNull { it.albumId == path && it.parentUri != null }?.parentUri?.let { return it }
         val roots = getSafUris().mapNotNull { value ->
             val uri = Uri.parse(value)
@@ -642,6 +649,18 @@ class MediaRepository(private val context: Context) {
             }
         }
         return null
+    }
+
+    suspend fun createAlbum(name: String, parent: Album) = withContext(Dispatchers.IO) {
+        val cleanName = name.trim()
+        require(cleanName.isNotEmpty() && cleanName !in setOf(".", "..") && '/' !in cleanName && '\\' !in cleanName) { "Enter a valid folder name" }
+        val parentUri = requireNotNull(parent.folderUri) { "Choose a writable destination folder" }
+        val path = "${parent.id.trimEnd('/')}/$cleanName"
+        require(path !in getAllDiscoveredFolders() && path !in getChosenFolders()) { "An album with this name already exists here" }
+        val uri = DocumentsContract.createDocument(context.contentResolver, parentUri, DocumentsContract.Document.MIME_TYPE_DIR, cleanName)
+            ?: error("Could not create album")
+        addDiscoveredFolder(path)
+        prefs.edit().putString("folder_uri_$path", uri.toString()).apply()
     }
 
     suspend fun buildDestinationAlbums(media: List<MediaItem>): List<Album> = withContext(Dispatchers.IO) {

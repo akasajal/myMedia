@@ -27,6 +27,7 @@ data class Album(
     val mediaCount: Int,
     val subAlbums: List<Album> = emptyList(),
     val folderUri: Uri? = null, // Document URI of the folder (SAF only)
+    val mostRecentDate: Long = 0L,
 )
 
 data class MediaGroup(

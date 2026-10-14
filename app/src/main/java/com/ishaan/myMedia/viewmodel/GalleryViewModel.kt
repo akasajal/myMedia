@@ -395,6 +395,17 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── Album management ──────────────────────────────────────────────────
 
+    fun createAlbum(name: String, parent: Album) {
+        viewModelScope.launch {
+            try {
+                repo.createAlbum(name, parent)
+                loadMedia()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = e.message ?: "Could not create album") }
+            }
+        }
+    }
+
     /** Pins or unpins an album (persisted in prefs). */
     fun togglePinAlbum(albumId: String) {
         val current = _uiState.value.pinnedAlbumIds.toMutableSet()
