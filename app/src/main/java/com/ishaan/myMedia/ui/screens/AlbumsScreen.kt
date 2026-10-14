@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -52,6 +53,7 @@ fun AlbumsScreen(
     pinnedAlbumIds: Set<String> = emptySet(),
     onTogglePin: (Album) -> Unit = {},
     modifier: Modifier = Modifier,
+    gridState: LazyGridState = rememberLazyGridState(),
 ) {
     var sortOrder by remember { mutableStateOf(AlbumSortOrder.NAME_ASC) }
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -86,6 +88,7 @@ fun AlbumsScreen(
                 onChange = { sortOrder = it },
             )
             LazyVerticalGrid(
+                state = gridState,
                 columns = GridCells.Fixed(2),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 80.dp),
@@ -291,9 +294,9 @@ fun AlbumDetailScreen(
     onBulkShare: () -> Unit = {},
     onBulkMove: () -> Unit = {},
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val scope = rememberCoroutineScope()
-    val listState = rememberLazyListState()
     val flatItems = groups.flatMap { it.items }
 
     BackHandler(enabled = selection.isActive) {

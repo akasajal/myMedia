@@ -4,7 +4,7 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -45,11 +45,17 @@ fun MainScreen(viewModel: GalleryViewModel) {
 
     // Hoisted scroll state — survives viewer open/close
     val mediaListState = rememberLazyListState()
+    val favoritesListState = rememberLazyListState()
+    val settingsListState = rememberLazyListState()
+    val albumsGridState = rememberLazyGridState()
 
     var selection by remember { mutableStateOf(SelectionState()) }
     var albumSelection by remember { mutableStateOf(SelectionState()) }
 
     var activeAlbum by remember { mutableStateOf<Album?>(null) }
+
+    // Keep the album's position while the viewer is shown; reset for a different album.
+    val albumListState = key(activeAlbum?.id) { rememberLazyListState() }
 
     // Viewer
     var viewerState by remember { mutableStateOf<ViewerState?>(null) }
@@ -308,6 +314,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
         val groups = viewModel.getGroupsForAlbum(album.id)
         AlbumDetailScreen(
             album             = album,
+            listState         = albumListState,
             groups            = groups,
             onBack            = { activeAlbum = null },
             onMediaClick      = { item, items, idx ->
@@ -437,12 +444,14 @@ fun MainScreen(viewModel: GalleryViewModel) {
                     onBulkMove      = { showBulkMoveSheet = true },
                 )
                 NavTab.ALBUMS -> AlbumsScreen(
+                    gridState       = albumsGridState,
                     uiState         = uiState,
                     onAlbumClick    = { activeAlbum = it },
                     pinnedAlbumIds  = uiState.pinnedAlbumIds,
                     onTogglePin     = { viewModel.togglePinAlbum(it.id) },
                 )
                 NavTab.FAVORITES -> FavoritesScreen(
+                    listState       = favoritesListState,
                     uiState         = uiState,
                     onMediaClick    = { item, items, idx ->
                         viewModel.loadMetadataFor(item)
@@ -452,6 +461,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
                     onColumnsChange = viewModel::updateGridColumns,
                 )
                 NavTab.SETTINGS -> SettingsScreen(
+                    listState           = settingsListState,
                     uiState             = uiState,
                     onThemeChange       = viewModel::setTheme,
                     onRestore           = viewModel::restoreDeleted,
