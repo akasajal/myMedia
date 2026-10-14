@@ -75,6 +75,7 @@ fun MediaViewerScreen(
     onCurrentIndexChange: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    DarkMediaSystemBars()
     val pagerState    = rememberPagerState(initialPage = initialIndex) { items.size }
     val stripState    = rememberLazyListState()
     val scope         = rememberCoroutineScope()

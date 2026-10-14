@@ -6,6 +6,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -100,6 +103,7 @@ fun GalleryTheme(
             val window = (view.context as Activity).window
             window.statusBarColor = Color.Transparent.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
         }
     }
     CompositionLocalProvider(LocalAccent provides accent) {
@@ -108,5 +112,25 @@ fun GalleryTheme(
             typography = Typography,
             content = content
         )
+    }
+}
+
+@Composable
+fun DarkMediaSystemBars() {
+    val view = LocalView.current
+    val lightTheme by rememberUpdatedState(MaterialTheme.colorScheme.background.luminance() > 0.5f)
+    if (!view.isInEditMode) {
+        val window = (view.context as Activity).window
+        val controller = WindowCompat.getInsetsController(window, view)
+        DisposableEffect(view) {
+            onDispose {
+                controller.isAppearanceLightStatusBars = lightTheme
+                controller.isAppearanceLightNavigationBars = lightTheme
+            }
+        }
+        SideEffect {
+            controller.isAppearanceLightStatusBars = false
+            controller.isAppearanceLightNavigationBars = false
+        }
     }
 }

@@ -51,6 +51,7 @@ fun VideoPlayerScreen(
     item: MediaItem,
     onBack: () -> Unit,
 ) {
+    DarkMediaSystemBars()
     BackHandler { onBack() }
 
     val context = LocalContext.current

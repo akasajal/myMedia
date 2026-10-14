@@ -58,6 +58,7 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.ishaan.myMedia.data.model.MediaItem
 import com.ishaan.myMedia.ui.theme.PrimaryAccent
+import com.ishaan.myMedia.ui.theme.DarkMediaSystemBars
 import com.ishaan.myMedia.ui.theme.SoftPurple
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -152,6 +153,7 @@ fun ImageEditorScreen(
     onBack: () -> Unit,
     onSave: (Bitmap, (Boolean) -> Unit) -> Unit,
 ) {
+    DarkMediaSystemBars()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
