@@ -55,6 +55,15 @@ data class DeletedItem(
 
 enum class AppTheme { SYSTEM, LIGHT, DARK }
 
+enum class AccentColor(val label: String, val argb: Long) {
+    ROSE("Rose", 0xFFC37B9A),
+    PURPLE("Purple", 0xFF9D88EF),
+    GREEN("Green", 0xFF78BE7C),
+    TEAL("Teal", 0xFF59BDBD),
+    GOLD("Gold", 0xFFF0C248),
+    SLATE("Slate", 0xFF6D80A6),
+}
+
 enum class SortOrder { DATE_DESC, DATE_ASC, NAME_ASC, SIZE_DESC }
 
 data class PrivacyPrefs(

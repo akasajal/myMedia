@@ -3,12 +3,16 @@ package com.ishaan.myMedia.ui.screens
 import android.os.Environment
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.*
@@ -17,12 +21,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.ishaan.myMedia.data.model.AppTheme
+import com.ishaan.myMedia.data.model.AccentColor
 import com.ishaan.myMedia.data.model.DeletedItem
 import com.ishaan.myMedia.data.model.PrivacyPrefs
 import com.ishaan.myMedia.ui.components.PinSetupDialog
@@ -41,6 +51,7 @@ fun SettingsScreen(
     onSetInstantLock: (Boolean) -> Unit,
     onOpenRecycleBin: () -> Unit,
     onOpenMediaFolders: () -> Unit,
+    onAccentColorChange: (AccentColor) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
@@ -50,11 +61,12 @@ fun SettingsScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        item { SettingsSection("Appearance") }
         item {
-            ThemeSelector(
-                current  = uiState.theme,
-                onChange = onThemeChange,
+            AppearanceSettings(
+                currentTheme = uiState.theme,
+                onThemeChange = onThemeChange,
+                currentAccent = uiState.accentColor,
+                onAccentChange = onAccentColorChange,
             )
         }
 
@@ -124,35 +136,95 @@ private fun SettingsSection(title: String) {
 
 // ── Theme selector ────────────────────────────────────────────────────────────
 @Composable
-private fun ThemeSelector(current: AppTheme, onChange: (AppTheme) -> Unit) {
-    val options = listOf(
-        AppTheme.SYSTEM to "Follow system",
-        AppTheme.LIGHT  to "Light",
-        AppTheme.DARK   to "Dark",
-    )
-    Card(
-        shape  = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-    ) {
+private fun AppearanceSettings(
+    currentTheme: AppTheme,
+    onThemeChange: (AppTheme) -> Unit,
+    currentAccent: AccentColor,
+    onAccentChange: (AccentColor) -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val labelWidth = if (maxWidth < 360.dp) 88.dp else 120.dp
         Column {
-            options.forEachIndexed { idx, (theme, label) ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onChange(theme) }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    RadioButton(
-                        selected = current == theme,
-                        onClick  = { onChange(theme) },
-                        colors   = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary),
-                    )
-                }
-                if (idx < options.lastIndex)
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
+            Text(
+                "APPEARANCE",
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 2.sp,
+                color = colors.primary,
+                modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Theme", modifier = Modifier.width(labelWidth), style = MaterialTheme.typography.bodyLarge)
+                ThemeSelector(currentTheme, onThemeChange, Modifier.weight(1f))
             }
+            HorizontalDivider(
+                color = colors.outlineVariant.copy(alpha = 0.35f),
+                modifier = Modifier.padding(top = 20.dp, bottom = 12.dp),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Accent Color", modifier = Modifier.width(labelWidth), style = MaterialTheme.typography.bodyLarge)
+                Row(Modifier.weight(1f).selectableGroup()) {
+                    AccentColor.entries.forEach { accent ->
+                        val selected = accent == currentAccent
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .semantics { contentDescription = accent.label + " accent" }
+                                .selectable(selected = selected, role = Role.RadioButton, onClick = { onAccentChange(accent) }),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(36.dp)
+                                    .then(if (selected) Modifier.border(1.dp, colors.primary, CircleShape) else Modifier)
+                                    .padding(3.dp)
+                                    .background(Color(accent.argb), CircleShape)
+                            )
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.35f), modifier = Modifier.padding(top = 12.dp))
+        }
+    }
+}
+
+@Composable
+private fun ThemeSelector(current: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val options = listOf(AppTheme.SYSTEM to "System", AppTheme.DARK to "Dark", AppTheme.LIGHT to "Light")
+    Row(
+        modifier
+            .height(IntrinsicSize.Min)
+            .clip(RoundedCornerShape(28.dp))
+            .border(1.dp, colors.outlineVariant, RoundedCornerShape(28.dp))
+            .background(colors.surface)
+            .selectableGroup(),
+    ) {
+        options.forEachIndexed { index, (theme, label) ->
+            val selected = current == theme
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .background(if (selected) colors.primaryContainer else Color.Transparent)
+                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onChange(theme) })
+                    .padding(horizontal = 4.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (selected) {
+                    Icon(Icons.Rounded.Check, null, modifier = Modifier.size(12.dp), tint = colors.onPrimaryContainer)
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant,
+                )
+            }
+            if (index < options.lastIndex) VerticalDivider(color = colors.outlineVariant)
         }
     }
 }

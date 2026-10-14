@@ -464,6 +464,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
                     listState           = settingsListState,
                     uiState             = uiState,
                     onThemeChange       = viewModel::setTheme,
+                    onAccentColorChange = viewModel::setAccentColor,
                     onRestore           = viewModel::restoreDeleted,
                     onPermanentlyDelete = viewModel::permanentlyDelete,
                     onSavePin           = viewModel::savePin,

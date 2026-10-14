@@ -9,6 +9,8 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import androidx.documentfile.provider.DocumentFile
 import com.ishaan.myMedia.data.model.Album
+import com.ishaan.myMedia.data.model.AccentColor
+import com.ishaan.myMedia.data.model.AppTheme
 import com.ishaan.myMedia.data.model.DeletedItem
 import com.ishaan.myMedia.data.model.MediaGroup
 import com.ishaan.myMedia.data.model.MediaItem
@@ -27,6 +29,22 @@ class MediaRepository(private val context: Context) {
 
     // ── Favorites (persisted via SharedPreferences) ───────────────────────
     private val prefs = context.getSharedPreferences("gallery_prefs", Context.MODE_PRIVATE)
+
+    fun getTheme(): AppTheme = AppTheme.entries.firstOrNull {
+        it.name == prefs.getString("theme", null)
+    } ?: AppTheme.SYSTEM
+
+    fun setTheme(theme: AppTheme) {
+        prefs.edit().putString("theme", theme.name).apply()
+    }
+
+    fun getAccentColor(): AccentColor = AccentColor.entries.firstOrNull {
+        it.name == prefs.getString("accent_color", null)
+    } ?: AccentColor.PURPLE
+
+    fun setAccentColor(accent: AccentColor) {
+        prefs.edit().putString("accent_color", accent.name).apply()
+    }
 
     private val _favoriteIds = MutableStateFlow(
         prefs.getStringSet("favorites", emptySet())!!.map { it.toLong() }.toMutableSet()

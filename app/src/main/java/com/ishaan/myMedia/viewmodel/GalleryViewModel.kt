@@ -26,6 +26,7 @@ data class GalleryUiState(
     val folderTree: List<FolderNode> = emptyList(),
     val allFolderPaths: Set<String> = emptySet(),
     val theme: AppTheme = AppTheme.SYSTEM,
+    val accentColor: AccentColor = AccentColor.PURPLE,
     val gridColumns: Int = 3,
     val sortOrder: SortOrder = SortOrder.DATE_DESC,
     val totalStorageUsage: Long = 0L,
@@ -46,7 +47,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     private val _viewerIndex = MutableStateFlow(-1)
     val viewerIndex: StateFlow<Int> = _viewerIndex.asStateFlow()
 
-    private val _theme = MutableStateFlow(AppTheme.SYSTEM)
+    private val _theme = MutableStateFlow(repo.getTheme())
     val theme: StateFlow<AppTheme> = _theme.asStateFlow()
 
     init {
@@ -58,6 +59,8 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
         _uiState.update { it.copy(
             privacyPrefs = priv,
+            theme = _theme.value,
+            accentColor = repo.getAccentColor(),
             isLocked = priv.pinEnabled,
             chosenFolders = folders,
             folderTree = repo.getFolderTree(),
@@ -340,8 +343,14 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setTheme(theme: AppTheme) {
+        repo.setTheme(theme)
         _theme.value = theme
         _uiState.update { it.copy(theme = theme) }
+    }
+
+    fun setAccentColor(accent: AccentColor) {
+        repo.setAccentColor(accent)
+        _uiState.update { it.copy(accentColor = accent) }
     }
 
     fun updateGridColumns(count: Int) {

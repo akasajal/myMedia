@@ -56,7 +56,7 @@ class MainActivity : FragmentActivity() {
                 AppTheme.DARK   -> true
             }
 
-            GalleryTheme(darkTheme = isDark) {
+            GalleryTheme(darkTheme = isDark, accentColor = uiState.accentColor) {
                 PermissionGate {
                     if (uiState.isLocked) {
                         LockScreen(
