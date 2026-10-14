@@ -20,6 +20,7 @@ data class GalleryUiState(
     val rawMedia: List<MediaItem> = emptyList(),       // unfiltered, used for re-applying visibility
     val mediaGroups: List<MediaGroup> = emptyList(),
     val albums: List<Album> = emptyList(),
+    val destinationAlbums: List<Album> = emptyList(),
     val favorites: List<MediaItem> = emptyList(),
     val deletedItems: List<DeletedItem> = emptyList(),
     val chosenFolders: Map<String, Boolean> = emptyMap(),   // path -> isVisible
@@ -80,6 +81,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 val media   = rawMedia.filter { repo.isFolderVisible(it.albumId) }  // for display
                 val groups  = repo.groupByDate(media)
                 val albums  = repo.buildAlbums(media)
+                val destinations = repo.buildDestinationAlbums(media)
                 val favs    = media.filter { repo.isFavorite(it.id) }
                 val deleted = repo.getDeletedItems()
                 _uiState.update {
@@ -89,6 +91,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                         allMedia       = media,
                         mediaGroups    = groups,
                         albums         = albums,
+                        destinationAlbums = destinations,
                         favorites      = favs,
                         deletedItems   = deleted,
                         totalStorageUsage = repo.calculateStorageUsage(media),
@@ -114,12 +117,14 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 val media = rawMedia.filter { repo.isFolderVisible(it.albumId) }
                 val groups = repo.groupByDate(media)
                 val albums = repo.buildAlbums(media)
+                val destinations = repo.buildDestinationAlbums(media)
                 val allFolderPaths = rawMedia.map { it.albumId }.toSet()
                 _uiState.update { it.copy(
                     rawMedia = rawMedia,
                     allMedia = media,
                     mediaGroups = groups,
                     albums = albums,
+                    destinationAlbums = destinations,
                     favorites = media.filter { item -> item.isFavorite },
                     totalStorageUsage = repo.calculateStorageUsage(media),
                     allFolderPaths = allFolderPaths,

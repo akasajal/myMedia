@@ -164,7 +164,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
         if (proxyItem != null) {
             MoveCopySheet(
                 item      = proxyItem.copy(name = "\${albumSelection.count} items"),
-                albums    = uiState.albums,
+                albums    = uiState.destinationAlbums,
                 onDismiss = { showAlbumBulkMoveSheet = false },
                 onMove    = { dest ->
                     albumSelection.selectedIds.forEach { id ->
@@ -210,7 +210,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
     if (itemToMove != null) {
         MoveCopySheet(
             item      = itemToMove!!,
-            albums    = uiState.albums,
+            albums    = uiState.destinationAlbums,
             onDismiss = { itemToMove = null },
             onMove    = { dest -> viewModel.moveMedia(itemToMove!!, dest) },
             onCopy    = { dest -> viewModel.copyMedia(itemToMove!!, dest) }
@@ -223,7 +223,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
         if (proxyItem != null) {
             MoveCopySheet(
                 item      = proxyItem.copy(name = "${selection.count} items"),
-                albums    = uiState.albums,
+                albums    = uiState.destinationAlbums,
                 onDismiss = { showBulkMoveSheet = false },
                 onMove    = { dest ->
                     selection.selectedIds.forEach { id ->

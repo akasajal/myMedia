@@ -608,10 +608,41 @@ class MediaRepository(private val context: Context) {
                     name       = displayName,
                     coverUri   = items.firstOrNull()?.uri,
                     mediaCount = items.size,
-                    folderUri  = items.firstOrNull { it.parentUri != null }?.parentUri
+                    folderUri  = folderUriForPath(albumId)
                 )
             }
             .sortedBy { it.name }
+    }
+
+    fun folderUriForPath(path: String): Uri? {
+        getSafCache().firstOrNull { it.albumId == path && it.parentUri != null }?.parentUri?.let { return it }
+        val roots = getSafUris().mapNotNull { value ->
+            val uri = Uri.parse(value)
+            safUriToDisplayPath(uri)?.let { it to uri }
+        }.sortedByDescending { it.first.length }
+        for ((root, treeUri) in roots) {
+            if (path != root && !path.startsWith("${root.trimEnd('/')}/")) continue
+            val treeId = DocumentsContract.getTreeDocumentId(treeUri)
+            if (path == root) return DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId)
+            if (treeUri.authority == "com.android.externalstorage.documents") {
+                val relative = path.removePrefix(root).trimStart('/')
+                val documentId = treeId + (if (treeId.endsWith(':')) "" else "/") + relative
+                return DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+            }
+        }
+        return null
+    }
+
+    suspend fun buildDestinationAlbums(media: List<MediaItem>): List<Album> = withContext(Dispatchers.IO) {
+        val roots = getChosenFolders()
+        val paths = roots + getAllDiscoveredFolders() + media.map { it.albumId }
+        paths.filter { path ->
+            isFolderVisible(path) && roots.any { path == it || path.startsWith("${it.trimEnd('/')}/") }
+        }.mapNotNull { path ->
+            val uri = folderUriForPath(path) ?: return@mapNotNull null
+            Album(path, path.substringAfterLast('/'), media.firstOrNull { it.albumId == path }?.uri,
+                media.count { it.albumId == path }, folderUri = uri)
+        }.sortedBy { it.name.lowercase() }
     }
 
     // ── Group by date ─────────────────────────────────────────────────────
