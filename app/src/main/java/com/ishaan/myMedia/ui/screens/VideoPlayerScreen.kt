@@ -65,6 +65,13 @@ fun VideoPlayerScreen(
     }
     DisposableEffect(exoPlayer) { onDispose { exoPlayer.release() } }
 
+    fun seekBy(delta: Long): Boolean {
+        val duration = exoPlayer.duration
+        if (duration <= 0L) return false
+        exoPlayer.seekTo((exoPlayer.currentPosition + delta).coerceIn(0L, duration))
+        return true
+    }
+
     // ── Playback state ─────────────────────────────────────────────────────
     var isPlaying     by remember { mutableStateOf(true) }
     var currentMs     by remember { mutableLongStateOf(0L) }
@@ -132,7 +139,7 @@ fun VideoPlayerScreen(
                     onDoubleTap = { offset ->
                         val isRight = offset.x > size.width / 2
                         val delta   = if (isRight) 10_000L else -10_000L
-                        exoPlayer.seekTo((exoPlayer.currentPosition + delta).coerceIn(0L, exoPlayer.duration))
+                        if (!seekBy(delta)) return@detectTapGestures
                         if (isRight) {
                             seekRippleRight = true
                             scope.launch { delay(400); seekRippleRight = false }
@@ -243,7 +250,7 @@ fun VideoPlayerScreen(
                 ControlButton(
                     size    = 48.dp,
                     onClick = {
-                        exoPlayer.seekTo((exoPlayer.currentPosition - 10_000L).coerceAtLeast(0L))
+                        seekBy(-10_000L)
                         showAndScheduleHide()
                     },
                 ) {
@@ -269,7 +276,7 @@ fun VideoPlayerScreen(
                 ControlButton(
                     size    = 48.dp,
                     onClick = {
-                        exoPlayer.seekTo((exoPlayer.currentPosition + 10_000L).coerceAtMost(exoPlayer.duration))
+                        seekBy(10_000L)
                         showAndScheduleHide()
                     },
                 ) {
@@ -313,6 +320,7 @@ fun VideoPlayerScreen(
 
                 // Seek bar
                 Slider(
+                    enabled = durationMs > 0L,
                     value    = if (isSeeking) seekMs.toFloat() else currentMs.toFloat(),
                     onValueChange = { v ->
                         isSeeking = true
