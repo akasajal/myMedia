@@ -3,6 +3,7 @@ package com.ishaan.myMedia
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -21,11 +22,15 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen  // ← NEW
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import com.ishaan.myMedia.data.model.AppTheme
 import com.ishaan.myMedia.ui.components.LockScreen
 import com.ishaan.myMedia.ui.screens.MainScreen
 import com.ishaan.myMedia.ui.theme.GalleryTheme
 import com.ishaan.myMedia.viewmodel.GalleryViewModel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
 
@@ -37,6 +42,15 @@ class MainActivity : FragmentActivity() {
 
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Protect previews before gallery content is drawn, including on a cold start.
+        updateRecentsPrivacy(viewModel.uiState.value.privacyPrefs.pinEnabled)
+        lifecycleScope.launch {
+            viewModel.uiState
+                .map { it.privacyPrefs.pinEnabled }
+                .distinctUntilChanged()
+                .collect { updateRecentsPrivacy(it) }
+        }
 
         // Optional: keep the splash visible while the ViewModel is still loading
         // (e.g. reading SharedPreferences for theme / lock state).
@@ -70,6 +84,18 @@ class MainActivity : FragmentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    private fun updateRecentsPrivacy(lockEnabled: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Keep foreground screenshots available while preventing media snapshots in Recents.
+            setRecentsScreenshotEnabled(!lockEnabled)
+        } else if (lockEnabled) {
+            // Older versions have no Recents-only snapshot control.
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
 
