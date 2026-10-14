@@ -434,6 +434,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 repo.createAlbum(name, parent)
+                _uiState.update { it.copy(operationMessage = "Folder created. Add photos or videos to show it in Albums.") }
                 loadMedia()
             } catch (e: Exception) {
                 _uiState.update { it.copy(operationMessage = e.message ?: "Could not create album. Check folder access and try again.") }

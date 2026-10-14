@@ -625,7 +625,7 @@ class MediaRepository(private val context: Context) {
     suspend fun buildAlbums(allMedia: List<MediaItem>): List<Album> = withContext(Dispatchers.IO) {
         val grouped = allMedia.groupBy { it.albumId }
         val roots = getChosenFolders()
-        (grouped.keys + getAllDiscoveredFolders() + roots)
+        grouped.keys
             .filter { path -> isFolderVisible(path) && roots.any { path == it || path.startsWith("${it.trimEnd('/')}/") } }
             .map { albumId ->
                 val items = grouped[albumId].orEmpty()
