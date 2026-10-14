@@ -171,11 +171,15 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             val visibleMedia = _uiState.value.rawMedia.filter { repo.isFolderVisible(it.albumId) }
             val groups = repo.groupByDate(visibleMedia)
             val albums = repo.buildAlbums(visibleMedia)
+            val destinations = repo.buildDestinationAlbums(visibleMedia)
             _uiState.update {
                 it.copy(
                     allMedia    = visibleMedia,  // Bug 1 fix: keep allMedia in sync with visibility
                     mediaGroups = groups,
                     albums      = albums,
+                    destinationAlbums = destinations,
+                    favorites = visibleMedia.filter { it.isFavorite },
+                    totalStorageUsage = repo.calculateStorageUsage(visibleMedia),
                 )
             }
         }

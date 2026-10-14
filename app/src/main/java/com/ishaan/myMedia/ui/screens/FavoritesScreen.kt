@@ -31,7 +31,8 @@ fun FavoritesScreen(
         return
     }
 
-    val flatFavs = uiState.favorites
+    val visibleIds = uiState.allMedia.map { it.id }.toSet()
+    val flatFavs = uiState.favorites.filter { it.id in visibleIds }
 
     if (flatFavs.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
