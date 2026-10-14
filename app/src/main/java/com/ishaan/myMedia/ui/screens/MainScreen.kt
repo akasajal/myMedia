@@ -47,6 +47,15 @@ data class ViewerState(
 
 @Composable
 fun MainScreen(viewModel: GalleryViewModel) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    Box(Modifier.fillMaxSize()) {
+        MainScreenContent(viewModel, snackbarHostState)
+        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 80.dp))
+    }
+}
+
+@Composable
+private fun MainScreenContent(viewModel: GalleryViewModel, snackbarHostState: SnackbarHostState) {
     val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
     if (uiState.operationBusy) AlertDialog(
         onDismissRequest = {}, title = { Text("Organizing media") },
@@ -184,7 +193,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
     if (showAlbumBulkDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showAlbumBulkDeleteDialog = false },
-            title = { Text("Move \${albumSelection.count} items to Recycle Bin?") },
+            title = { Text("Move ${albumSelection.count} items to Recycle Bin?") },
             text = { Text("They will be permanently deleted after 30 days.") },
             confirmButton = {
                 TextButton(
@@ -206,7 +215,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
         val proxyItem = uiState.allMedia.firstOrNull { it.id in albumSelection.selectedIds }
         if (proxyItem != null) {
             MoveCopySheet(
-                item      = proxyItem.copy(name = "\${albumSelection.count} items"),
+                item      = proxyItem.copy(name = "${albumSelection.count} items"),
                 albums    = uiState.destinationAlbums,
                 onDismiss = { showAlbumBulkMoveSheet = false },
                 onMove    = { dest ->
@@ -281,14 +290,8 @@ fun MainScreen(viewModel: GalleryViewModel) {
     // Save result snackbar
     saveResult?.let { msg ->
         LaunchedEffect(msg) {
-            kotlinx.coroutines.delay(2500)
+            snackbarHostState.showSnackbar(msg)
             saveResult = null
-        }
-        Box(
-            Modifier.fillMaxSize().padding(bottom = 80.dp),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            Snackbar(modifier = Modifier.padding(16.dp)) { Text(msg) }
         }
     }
 
@@ -376,7 +379,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
                         putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
-                    context.startActivity(Intent.createChooser(shareIntent, "Share \${uris.size} items"))
+                    context.startActivity(Intent.createChooser(shareIntent, "Share ${uris.size} items"))
                     albumSelection = SelectionState()
                 }
             },
