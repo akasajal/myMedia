@@ -268,7 +268,7 @@ fun VideoPlayerScreen(
                     Icon(
                         imageVector        = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint               = Color.White,
+                        tint               = AccentForeground,
                         modifier           = Modifier.size(36.dp),
                     )
                 }

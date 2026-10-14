@@ -39,6 +39,7 @@ import com.ishaan.myMedia.data.model.MediaGroup
 import com.ishaan.myMedia.data.model.MediaItem
 import com.ishaan.myMedia.ui.components.DateGroupHeader
 import com.ishaan.myMedia.ui.components.MediaGridRow
+import com.ishaan.myMedia.ui.theme.AccentForeground
 import com.ishaan.myMedia.ui.theme.PrimaryAccent
 import com.ishaan.myMedia.ui.theme.SoftPurple
 import com.ishaan.myMedia.viewmodel.GalleryUiState
@@ -114,7 +115,7 @@ fun AlbumsScreen(
                 .align(Alignment.BottomEnd)
                 .padding(16.dp),
         ) {
-            Icon(Icons.Rounded.CreateNewFolder, "Create album", tint = Color.White)
+            Icon(Icons.Rounded.CreateNewFolder, "Create album", tint = AccentForeground)
         }
     }
 

@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import com.ishaan.myMedia.data.model.FolderNode
+import com.ishaan.myMedia.ui.theme.AccentForeground
 import com.ishaan.myMedia.ui.theme.PrimaryAccent
 import com.ishaan.myMedia.ui.theme.SoftPurple
 
@@ -72,11 +73,11 @@ fun MediaFoldersScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.Add, null, tint = androidx.compose.ui.graphics.Color.White)
+                    Icon(Icons.Rounded.Add, null, tint = AccentForeground)
                     Text(
                         "Add new root folder",
                         style = MaterialTheme.typography.labelLarge,
-                        color = androidx.compose.ui.graphics.Color.White,
+                        color = AccentForeground,
                     )
                 }
             }

@@ -32,6 +32,7 @@ import coil.request.ImageRequest
 import com.ishaan.myMedia.data.model.MediaItem
 import com.ishaan.myMedia.data.model.MediaType
 import com.ishaan.myMedia.ui.theme.PrimaryAccent
+import com.ishaan.myMedia.ui.theme.AccentForeground
 import com.ishaan.myMedia.ui.theme.SoftPurple
 
 // ── Shimmer brush ─────────────────────────────────────────────────────────────
@@ -144,7 +145,7 @@ fun MediaThumbnail(
                 Icon(
                     Icons.Rounded.CheckCircle,
                     contentDescription = "Selected",
-                    tint = Color.White,
+                    tint = AccentForeground,
                     modifier = Modifier.fillMaxSize().padding(2.dp),
                 )
             }
@@ -210,7 +211,7 @@ fun MediaThumbnail(
                     .background(PrimaryAccent.copy(alpha = 0.85f), RoundedCornerShape(4.dp))
                     .padding(horizontal = 4.dp, vertical = 2.dp)
             ) {
-                Text("GIF", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                Text("GIF", style = MaterialTheme.typography.labelSmall, color = AccentForeground)
             }
         }
     }
