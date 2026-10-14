@@ -9,6 +9,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -35,6 +37,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -290,6 +296,8 @@ fun ImageEditorScreen(
                         onFilterSelect = { selectedFilter = it },
                     )
                     EditorTool.CROP -> CropHintPanel(
+                        cropRect = cropRect,
+                        onCropChange = { cropRect = it; cropApplied = true },
                         onReset = { cropRect = Rect(0f, 0f, 1f, 1f); cropApplied = false }
                     )
                     EditorTool.ROTATE -> RotatePanel(
@@ -447,14 +455,14 @@ private fun RotatePanel(
 // ── Crop hint panel ───────────────────────────────────────────────────────────
 
 @Composable
-private fun CropHintPanel(onReset: () -> Unit) {
+private fun CropHintPanel(cropRect: Rect, onCropChange: (Rect) -> Unit, onReset: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            "Drag the corner and edge handles in the preview to crop",
+            "Drag the handles or adjust the crop edges below",
             color = Color.Gray,
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
@@ -467,12 +475,37 @@ private fun CropHintPanel(onReset: () -> Unit) {
         ) {
             Text("Reset Crop", color = Color.Gray, fontSize = 12.sp)
         }
+        CropEdgeControl("Left", cropRect.left, 0f..(cropRect.right - 0.05f)) {
+            onCropChange(cropRect.copy(left = it))
+        }
+        CropEdgeControl("Right", cropRect.right, (cropRect.left + 0.05f)..1f) {
+            onCropChange(cropRect.copy(right = it))
+        }
+        CropEdgeControl("Top", cropRect.top, 0f..(cropRect.bottom - 0.05f)) {
+            onCropChange(cropRect.copy(top = it))
+        }
+        CropEdgeControl("Bottom", cropRect.bottom, (cropRect.top + 0.05f)..1f) {
+            onCropChange(cropRect.copy(bottom = it))
+        }
     }
+}
+
+@Composable
+private fun CropEdgeControl(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
+    Text("$label: ${(value * 100).toInt()}%", color = Color.White)
+    Slider(
+        value = value.coerceIn(range),
+        onValueChange = onChange,
+        valueRange = range,
+        modifier = Modifier.fillMaxWidth().semantics {
+            contentDescription = "$label crop edge"
+            stateDescription = "${(value * 100).toInt()} percent"
+        },
+    )
 }
 
 // ── Crop preview with interactive handles ─────────────────────────────────────
 
-private const val HANDLE_PX = 40f  // touch target size in px
 
 private enum class DragHandle {
     NONE,
@@ -493,6 +526,7 @@ private fun CroppablePreview(
     var activeDrag by remember { mutableStateOf(DragHandle.NONE) }
     var dragStart by remember { mutableStateOf(Offset.Zero) }
     var rectAtDragStart by remember { mutableStateOf(Rect(0f, 0f, 1f, 1f)) }
+    val handleTolerance = with(LocalDensity.current) { 24.dp.toPx() }
 
     Box(
         modifier = Modifier
@@ -534,7 +568,7 @@ private fun CroppablePreview(
                                     cropRect.left * w, cropRect.top * h,
                                     cropRect.right * w, cropRect.bottom * h
                                 )
-                                activeDrag = hitTestHandle(px, py, r, HANDLE_PX)
+                                activeDrag = hitTestHandle(px, py, r, handleTolerance)
                                 dragStart = pos
                                 rectAtDragStart = cropRect
                             },
