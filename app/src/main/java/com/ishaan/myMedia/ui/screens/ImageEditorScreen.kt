@@ -6,6 +6,7 @@ import android.graphics.Matrix
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -178,6 +179,10 @@ fun ImageEditorScreen(
         }
     }
 
+    val previewBitmap by produceState<Bitmap?>(null, sourceBitmap, rotationDegrees) {
+        value = withContext(Dispatchers.Default) { sourceBitmap?.let { rotateBitmap(it, rotationDegrees) } }
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -231,24 +236,20 @@ fun ImageEditorScreen(
                 if (activeTool == EditorTool.CROP) {
                     CroppablePreview(
                         item = item,
-                        rotationDegrees = rotationDegrees,
+                        bitmap = previewBitmap,
                         colorFilter = selectedFilter.colorFilter,
                         cropRect = cropRect,
                         onCropRectChange = { cropRect = it; cropApplied = true },
                     )
                 } else {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(item.uri)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
+                    previewBitmap?.let { bitmap -> Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = item.name,
                         contentScale = androidx.compose.ui.layout.ContentScale.Fit,
                         colorFilter = selectedFilter.colorFilter,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { rotationZ = rotationDegrees.toFloat() },
-                    )
+                            .fillMaxSize(),
+                    ) }
                 }
             }
 
@@ -517,7 +518,7 @@ private enum class DragHandle {
 @Composable
 private fun CroppablePreview(
     item: MediaItem,
-    rotationDegrees: Int,
+    bitmap: Bitmap?,
     colorFilter: ColorFilter?,
     cropRect: Rect,
     onCropRectChange: (Rect) -> Unit,
@@ -527,24 +528,25 @@ private fun CroppablePreview(
     var dragStart by remember { mutableStateOf(Offset.Zero) }
     var rectAtDragStart by remember { mutableStateOf(Rect(0f, 0f, 1f, 1f)) }
     val handleTolerance = with(LocalDensity.current) { 24.dp.toPx() }
+    val currentCrop by rememberUpdatedState(cropRect)
+    val changeCrop by rememberUpdatedState(onCropRectChange)
+    val density = LocalDensity.current
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .clipToBounds(),
         contentAlignment = Alignment.Center,
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(item.uri)
-                .crossfade(true)
-                .build(),
-            contentDescription = null,
+        if (bitmap == null) return@BoxWithConstraints
+        val fit = min(constraints.maxWidth.toFloat() / bitmap.width, constraints.maxHeight.toFloat() / bitmap.height)
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = item.name,
             contentScale = androidx.compose.ui.layout.ContentScale.Fit,
             colorFilter = colorFilter,
             modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { rotationZ = rotationDegrees.toFloat() }
+                .size(with(density) { (bitmap.width * fit).toDp() }, with(density) { (bitmap.height * fit).toDp() })
                 .onSizeChanged { imageSize = it },
         )
 
@@ -559,18 +561,18 @@ private fun CroppablePreview(
                         width = with(androidx.compose.ui.platform.LocalDensity.current) { w.toDp() },
                         height = with(androidx.compose.ui.platform.LocalDensity.current) { h.toDp() },
                     )
-                    .pointerInput(imageSize) {
+                    .pointerInput(imageSize, handleTolerance) {
                         detectDragGestures(
                             onDragStart = { pos ->
                                 val px = pos.x
                                 val py = pos.y
                                 val r = Rect(
-                                    cropRect.left * w, cropRect.top * h,
-                                    cropRect.right * w, cropRect.bottom * h
+                                    currentCrop.left * w, currentCrop.top * h,
+                                    currentCrop.right * w, currentCrop.bottom * h
                                 )
                                 activeDrag = hitTestHandle(px, py, r, handleTolerance)
                                 dragStart = pos
-                                rectAtDragStart = cropRect
+                                rectAtDragStart = currentCrop
                             },
                             onDragEnd = { activeDrag = DragHandle.NONE },
                             onDragCancel = { activeDrag = DragHandle.NONE },
@@ -630,7 +632,7 @@ private fun CroppablePreview(
                                     }
                                     DragHandle.NONE -> r
                                 }
-                                if (activeDrag != DragHandle.NONE) onCropRectChange(newRect)
+                                if (activeDrag != DragHandle.NONE) changeCrop(newRect)
                             }
                         )
                     }
@@ -718,6 +720,12 @@ private fun DrawScope.drawCropOverlay(cropRect: Rect, canvasW: Float, canvasH: F
 
 // ── Edit application (runs off main thread) ───────────────────────────────────
 
+private fun rotateBitmap(source: Bitmap, rotationDegrees: Int): Bitmap {
+    if (rotationDegrees == 0) return source
+    val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+    return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+}
+
 private fun applyEdits(
     source: Bitmap,
     rotationDegrees: Int,
@@ -725,12 +733,7 @@ private fun applyEdits(
     filter: PhotoFilter,
 ): Bitmap {
     // 1. Rotate
-    val rotated = if (rotationDegrees == 0) {
-        source
-    } else {
-        val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
-        Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
-    }
+    val rotated = rotateBitmap(source, rotationDegrees)
 
     // 2. Crop
     val cx = (cropRect.left * rotated.width).toInt().coerceIn(0, rotated.width - 1)
