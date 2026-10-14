@@ -375,6 +375,7 @@ fun ZoomableImage(
 ) {
     val scope = rememberCoroutineScope()
     var transform by remember(item.uri) { mutableStateOf(ImageTransform()) }
+    var zoomTarget by remember(item.uri) { mutableFloatStateOf(1f) }
     var motionJob by remember(item.uri) { mutableStateOf<Job?>(null) }
     var viewport by remember { mutableStateOf(Size.Zero) }
     var imageSize by remember(item.uri) { mutableStateOf(Size.Zero) }
@@ -405,10 +406,13 @@ fun ZoomableImage(
                     onDoubleTap = { position ->
                         motionJob?.cancel()
                         val start = transform
-                        val targetScale = if (start.scale > 1f) 1f else 2.5f
+                        // Reverse the requested zoom even if the previous animation was interrupted.
+                        val targetScale = if (zoomTarget > 1f) 1f else 2.5f
+                        zoomTarget = targetScale
+                        val ratio = targetScale / start.scale
                         val center = Offset(viewport.width / 2f, viewport.height / 2f)
                         val targetOffset = if (targetScale == 1f) Offset.Zero else
-                            ((center - position) * (targetScale - 1f))
+                            (start.offset * ratio + (center - position) * (ratio - 1f))
                                 .clampTo(imagePanBounds(viewport, imageSize, targetScale))
                         motionJob = scope.launch {
                             // Scale and translation advance together and are bounded on every frame.
@@ -440,6 +444,7 @@ fun ZoomableImage(
                             usedMultiplePointers = true
                             val old = transform
                             val newScale = (old.scale * event.calculateZoom()).coerceIn(1f, 5f)
+                            zoomTarget = newScale
                             val ratio = newScale / old.scale
                             val center = Offset(size.width / 2f, size.height / 2f)
                             val focalPoint = event.calculateCentroid(useCurrent = false) - center
