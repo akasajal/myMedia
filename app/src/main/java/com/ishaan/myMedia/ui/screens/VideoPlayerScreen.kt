@@ -72,9 +72,8 @@ fun VideoPlayerScreen(
     DisposableEffect(exoPlayer) { onDispose { exoPlayer.release() } }
 
     fun seekBy(delta: Long): Boolean {
-        val duration = exoPlayer.duration
-        if (duration <= 0L) return false
-        exoPlayer.seekTo((exoPlayer.currentPosition + delta).coerceIn(0L, duration))
+        val target = boundedSeekPosition(exoPlayer.currentPosition, delta, exoPlayer.duration) ?: return false
+        exoPlayer.seekTo(target)
         return true
     }
 

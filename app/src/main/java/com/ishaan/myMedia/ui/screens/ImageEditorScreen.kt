@@ -573,14 +573,14 @@ private fun CroppablePreview(
         contentAlignment = Alignment.Center,
     ) {
         if (bitmap == null) return@BoxWithConstraints
-        val fit = min(constraints.maxWidth.toFloat() / bitmap.width, constraints.maxHeight.toFloat() / bitmap.height)
+        val (fittedWidth, fittedHeight) = fittedImageDimensions(bitmap.width, bitmap.height, constraints.maxWidth, constraints.maxHeight)
         Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = item.name,
             contentScale = androidx.compose.ui.layout.ContentScale.Fit,
             colorFilter = colorFilter,
             modifier = Modifier
-                .size(with(density) { (bitmap.width * fit).toDp() }, with(density) { (bitmap.height * fit).toDp() })
+                .size(with(density) { fittedWidth.toDp() }, with(density) { fittedHeight.toDp() })
                 .onSizeChanged { imageSize = it },
         )
 
