@@ -2,6 +2,9 @@ package com.ishaan.myMedia.data.repository
 
 import android.content.ContentUris
 import android.content.Context
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -510,6 +513,14 @@ class MediaRepository(private val context: Context) {
         mediaType: MediaType,
         chosenFolders: Set<String>
     ): List<MediaItem> {
+        val permission = if (Build.VERSION.SDK_INT >= 33) {
+            if (mediaType == MediaType.VIDEO) Manifest.permission.READ_MEDIA_VIDEO else Manifest.permission.READ_MEDIA_IMAGES
+        } else Manifest.permission.READ_EXTERNAL_STORAGE
+        val hasFullAccess = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        val hasSelectedAccess = Build.VERSION.SDK_INT >= 34 && ContextCompat.checkSelfPermission(
+            context, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasFullAccess && !hasSelectedAccess) return emptyList()
         val projection = if (mediaType == MediaType.VIDEO) {
             arrayOf(
                 MediaStore.MediaColumns._ID,

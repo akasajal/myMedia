@@ -3,6 +3,10 @@ package com.ishaan.myMedia
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import android.view.WindowManager
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,6 +20,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,6 +29,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen  // ← NEW
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ishaan.myMedia.data.model.AppTheme
 import com.ishaan.myMedia.ui.components.LockScreen
 import com.ishaan.myMedia.ui.screens.MainScreen
@@ -71,7 +80,7 @@ class MainActivity : FragmentActivity() {
             }
 
             GalleryTheme(darkTheme = isDark, accentColor = uiState.accentColor) {
-                PermissionGate {
+                PermissionGate(onPermissionsChanged = viewModel::loadMedia) {
                     if (uiState.isLocked) {
                         LockScreen(
                             useBiometrics           = uiState.privacyPrefs.biometricsEnabled,
@@ -125,34 +134,44 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-fun PermissionGate(onGranted: @Composable () -> Unit) {
+fun PermissionGate(onPermissionsChanged: () -> Unit, onGranted: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val permissionsChanged by rememberUpdatedState(onPermissionsChanged)
     var hasPermission by remember { mutableStateOf(false) }
-
-    val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        arrayOf(
-            Manifest.permission.READ_MEDIA_IMAGES,
-            Manifest.permission.READ_MEDIA_VIDEO,
-        )
-    } else {
-        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    var folderOnly by rememberSaveable { mutableStateOf(false) }
+    val permissions = when {
+        Build.VERSION.SDK_INT >= 34 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+        Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+        else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
-
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { results ->
-        hasPermission = results.values.all { it }
+    fun refreshAccess() {
+        hasPermission = permissions.any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED } ||
+            context.contentResolver.persistedUriPermissions.any { it.isReadPermission }
+        if (hasPermission || folderOnly) permissionsChanged()
     }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refreshAccess() }
+    DisposableEffect(lifecycleOwner, folderOnly) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) refreshAccess() }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(Unit) { refreshAccess() }
 
-    LaunchedEffect(Unit) { launcher.launch(permissions) }
-
-    if (hasPermission) {
+    if (hasPermission || folderOnly) {
         onGranted()
     } else {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Storage permission needed", style = MaterialTheme.typography.titleMedium)
+        Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Text("Choose media access", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = { launcher.launch(permissions) }) { Text("Grant permission") }
+                Text("Allow photos, videos, or selected media. You can also choose individual folders in Settings without granting library access.")
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = { launcher.launch(permissions) }) { Text("Allow media access") }
+                TextButton(onClick = {
+                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
+                }) { Text("Open permission settings") }
+                TextButton(onClick = { folderOnly = true; permissionsChanged() }) { Text("Continue with folders") }
             }
         }
     }
