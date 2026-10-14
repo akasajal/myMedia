@@ -27,17 +27,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.common.Player
@@ -52,9 +54,10 @@ import com.ishaan.myMedia.data.model.MediaType
 import com.ishaan.myMedia.ui.components.MediaThumbnail
 import com.ishaan.myMedia.ui.theme.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.abs
+import kotlin.math.min
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -77,6 +80,7 @@ fun MediaViewerScreen(
     var showInfo      by remember { mutableStateOf(false) }
 
     val currentItem = items.getOrNull(pagerState.currentPage) ?: return
+    var isImageZoomed by remember(currentItem.uri) { mutableStateOf(false) }
 
     // Hoist ExoPlayer above the pager so it never lives inside a disposable page slot.
     // Keyed to the current page URI — rebuilds only when you land on a different video.
@@ -111,6 +115,8 @@ fun MediaViewerScreen(
         // ── Pager ─────────────────────────────────────────────────────────
         HorizontalPager(
             state = pagerState,
+            userScrollEnabled = !isImageZoomed,
+            key = { items[it].uri.toString() },
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val item = items[page]
@@ -125,6 +131,7 @@ fun MediaViewerScreen(
                 ZoomableImage(
                     item        = item,
                     onSingleTap = { showOverlay = !showOverlay },
+                    onZoomChanged = { if (pagerState.currentPage == page) isImageZoomed = it },
                 )
             }
         }
@@ -342,124 +349,132 @@ fun ThumbnailStrip(
 }
 
 // ── Zoomable image ────────────────────────────────────────────────────────────
+private data class ImageTransform(val scale: Float = 1f, val offset: Offset = Offset.Zero)
+
+private fun imagePanBounds(viewport: Size, image: Size, scale: Float): Offset {
+    val fitted = if (image.width > 0f && image.height > 0f) {
+        val fit = min(viewport.width / image.width, viewport.height / image.height)
+        Size(image.width * fit, image.height * fit)
+    } else viewport
+    return Offset(
+        ((fitted.width * scale - viewport.width) / 2f).coerceAtLeast(0f),
+        ((fitted.height * scale - viewport.height) / 2f).coerceAtLeast(0f),
+    )
+}
+
+private fun Offset.clampTo(bounds: Offset): Offset = Offset(
+    x.coerceIn(-bounds.x, bounds.x),
+    y.coerceIn(-bounds.y, bounds.y),
+)
+
 @Composable
 fun ZoomableImage(
     item: MediaItem,
     onSingleTap: () -> Unit,
+    onZoomChanged: (Boolean) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
-    val scale = remember { Animatable(1f) }
-    val offset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    var transform by remember(item.uri) { mutableStateOf(ImageTransform()) }
+    var motionJob by remember(item.uri) { mutableStateOf<Job?>(null) }
+    var viewport by remember { mutableStateOf(Size.Zero) }
+    var imageSize by remember(item.uri) { mutableStateOf(Size.Zero) }
+    val singleTap by rememberUpdatedState(onSingleTap)
+    val zoomChanged by rememberUpdatedState(onZoomChanged)
+
+    fun updateTransform(value: ImageTransform) {
+        val scale = value.scale.coerceIn(1f, 5f)
+        transform = ImageTransform(
+            scale,
+            if (scale == 1f) Offset.Zero else value.offset.clampTo(imagePanBounds(viewport, imageSize, scale)),
+        )
+        zoomChanged(scale > 1f)
+    }
+
+    DisposableEffect(item.uri) {
+        onDispose { motionJob?.cancel() }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                val velocityTracker = VelocityTracker()
-                val flingSpec = exponentialDecay<Offset>()
-                var lastTapTime = 0L
-
-                awaitEachGesture {
-                    val firstDown = awaitFirstDown(requireUnconsumed = false)
-                    val now = System.currentTimeMillis()
-                    val isDoubleTap = now - lastTapTime < 300L
-                    lastTapTime = now
-
-                    if (isDoubleTap) {
-                        // Handle Double Tap Zoom
-                        scope.launch {
-                            if (scale.value > 1f) {
-                                launch { scale.animateTo(1f) }
-                                launch { offset.animateTo(Offset.Zero) }
-                            } else {
-                                val targetScale = 2.5f
-                                val boundsX = (size.width * (targetScale - 1) / 2)
-                                val boundsY = (size.height * (targetScale - 1) / 2)
-
-                                val tapOffset = firstDown.position
-                                val targetX = ((size.width / 2) - tapOffset.x) * (targetScale - 1)
-                                val targetY = ((size.height / 2) - tapOffset.y) * (targetScale - 1)
-
-                                launch { scale.animateTo(targetScale) }
-                                launch { offset.animateTo(Offset(targetX.coerceIn(-boundsX, boundsX), targetY.coerceIn(-boundsY, boundsY))) }
+            .clipToBounds()
+            .onSizeChanged { viewport = Size(it.width.toFloat(), it.height.toFloat()) }
+            .pointerInput(item.uri, viewport, imageSize) {
+                detectTapGestures(
+                    onTap = { singleTap() },
+                    onDoubleTap = { position ->
+                        motionJob?.cancel()
+                        val start = transform
+                        val targetScale = if (start.scale > 1f) 1f else 2.5f
+                        val center = Offset(viewport.width / 2f, viewport.height / 2f)
+                        val targetOffset = if (targetScale == 1f) Offset.Zero else
+                            ((center - position) * (targetScale - 1f))
+                                .clampTo(imagePanBounds(viewport, imageSize, targetScale))
+                        motionJob = scope.launch {
+                            // Scale and translation advance together and are bounded on every frame.
+                            animate(0f, 1f, animationSpec = tween(220)) { fraction, _ ->
+                                updateTransform(ImageTransform(
+                                    start.scale + (targetScale - start.scale) * fraction,
+                                    start.offset + (targetOffset - start.offset) * fraction,
+                                ))
                             }
                         }
-                    } else {
-                        // Single tap might be detected at the end if no drag happened
-                    }
-
-                    var currentScale = scale.value
-                    var currentOffset = offset.value
-                    var hasMoved = false
-
+                    },
+                )
+            }
+            .pointerInput(item.uri, viewport, imageSize) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    // A new gesture owns the transform; older zoom/fling jobs cannot overwrite it.
+                    motionJob?.cancel()
+                    val tracker = VelocityTracker()
+                    tracker.addPosition(down.uptimeMillis, down.position)
+                    var usedMultiplePointers = false
+                    var wasPanning = false
+                    var accumulatedPan = Offset.Zero
                     do {
                         val event = awaitPointerEvent()
-                        val dragChange = event.changes.firstOrNull { it.id == firstDown.id }
-
-                        if (event.changes.size > 1) {
-                            // Multi-finger: Zoom & Pan
-                            val zoomChange = event.calculateZoom()
-                            val panChange = event.calculatePan()
-
-                            currentScale = (currentScale * zoomChange).coerceIn(1f, 5f)
-
-                            val boundsX = (size.width * (currentScale - 1) / 2)
-                            val boundsY = (size.height * (currentScale - 1) / 2)
-
-                            currentOffset = Offset(
-                                x = (currentOffset.x + panChange.x).coerceIn(-boundsX, boundsX),
-                                y = (currentOffset.y + panChange.y).coerceIn(-boundsY, boundsY)
-                            )
-
-                            scope.launch {
-                                scale.snapTo(currentScale)
-                                offset.snapTo(currentOffset)
-                            }
+                        if (event.changes.any { it.isConsumed }) break
+                        val pointerCount = event.changes.count { it.pressed }
+                        if (pointerCount > 1) {
+                            usedMultiplePointers = true
+                            val old = transform
+                            val newScale = (old.scale * event.calculateZoom()).coerceIn(1f, 5f)
+                            val ratio = newScale / old.scale
+                            val center = Offset(size.width / 2f, size.height / 2f)
+                            val focalPoint = event.calculateCentroid(useCurrent = false) - center
+                            updateTransform(ImageTransform(
+                                newScale,
+                                old.offset * ratio + focalPoint * (1f - ratio) + event.calculatePan(),
+                            ))
                             event.changes.forEach { it.consume() }
-                            hasMoved = true
-                        } else if (dragChange != null) {
-                            val pan = dragChange.position - dragChange.previousPosition
-                            // Always track movement so pager swipes don't fire onSingleTap
-                            if (pan.getDistance() > 8f) hasMoved = true
-
-                            if (currentScale > 1f && pan.getDistance() > 1f) {
-                                val boundsX = (size.width * (currentScale - 1) / 2)
-                                val boundsY = (size.height * (currentScale - 1) / 2)
-
-                                currentOffset = Offset(
-                                    x = (currentOffset.x + pan.x).coerceIn(-boundsX, boundsX),
-                                    y = (currentOffset.y + pan.y).coerceIn(-boundsY, boundsY)
-                                )
-
-                                velocityTracker.addPosition(dragChange.uptimeMillis, dragChange.position)
-
-                                scope.launch { offset.snapTo(currentOffset) }
-                                dragChange.consume()
-                                hasMoved = true
+                        } else if (transform.scale > 1f) {
+                            val pan = event.calculatePan()
+                            accumulatedPan += pan
+                            if (wasPanning || accumulatedPan.getDistance() > viewConfiguration.touchSlop) {
+                                val delta = if (wasPanning) pan else accumulatedPan
+                                wasPanning = true
+                                updateTransform(transform.copy(offset = transform.offset + delta))
+                                event.changes.forEach { it.consume() }
+                            }
+                            event.changes.firstOrNull { it.pressed }?.let {
+                                tracker.addPosition(it.uptimeMillis, it.position)
                             }
                         }
-                    } while (event.changes.fastAny { it.pressed })
+                    } while (event.changes.any { it.pressed })
 
-                    // Gesture ended - handle Fling or Single Tap
-                    if (currentScale > 1f && hasMoved) {
-                        val velocity = velocityTracker.calculateVelocity()
-                        scope.launch {
-                            val boundsX = (size.width * (currentScale - 1) / 2)
-                            val boundsY = (size.height * (currentScale - 1) / 2)
-
-                            offset.animateDecay(
-                                initialVelocity = Offset(velocity.x, velocity.y),
-                                animationSpec = flingSpec
-                            ) {
-                                val constrainedX = value.x.coerceIn(-boundsX, boundsX)
-                                val constrainedY = value.y.coerceIn(-boundsY, boundsY)
-                                if (constrainedX != value.x || constrainedY != value.y) {
-                                    scope.launch { offset.snapTo(Offset(constrainedX, constrainedY)) }
-                                }
+                    // Pinching must not reuse a one-finger pan velocity for a fling.
+                    if (wasPanning && !usedMultiplePointers && transform.scale > 1f) {
+                        val velocity = tracker.calculateVelocity()
+                        val start = transform
+                        val bounds = imagePanBounds(viewport, imageSize, start.scale)
+                        motionJob = scope.launch {
+                            val pan = Animatable(start.offset, Offset.VectorConverter)
+                            pan.updateBounds(lowerBound = -bounds, upperBound = bounds)
+                            pan.animateDecay(Offset(velocity.x, velocity.y), exponentialDecay()) {
+                                updateTransform(start.copy(offset = value))
                             }
                         }
-                    } else if (!hasMoved && !isDoubleTap) {
-                        onSingleTap()
                     }
                 }
             },
@@ -470,15 +485,20 @@ fun ZoomableImage(
                 .data(item.uri)
                 .crossfade(true)
                 .build(),
+            onSuccess = { result ->
+                val intrinsicSize = result.painter.intrinsicSize
+                if (intrinsicSize.width > 0f && intrinsicSize.height > 0f) imageSize = intrinsicSize
+            },
             contentDescription = item.name,
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    scaleX = scale.value
-                    scaleY = scale.value
-                    translationX = offset.value.x
-                    translationY = offset.value.y
+                    val bounded = transform.offset.clampTo(imagePanBounds(viewport, imageSize, transform.scale))
+                    scaleX = transform.scale
+                    scaleY = transform.scale
+                    translationX = bounded.x
+                    translationY = bounded.y
                 },
         )
     }
