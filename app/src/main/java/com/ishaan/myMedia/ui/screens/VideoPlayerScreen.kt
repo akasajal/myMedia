@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -54,6 +55,9 @@ fun VideoPlayerScreen(
 
     val context = LocalContext.current
     val scope   = rememberCoroutineScope()
+    val recommendedTimeout = LocalAccessibilityManager.current
+    val accessibility = remember(context) { context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager }
+    var accessibilityEnabled by remember { mutableStateOf(accessibility.isEnabled) }
 
     // ── ExoPlayer ──────────────────────────────────────────────────────────
     val exoPlayer = remember {
@@ -86,6 +90,15 @@ fun VideoPlayerScreen(
     var showOverlay   by remember { mutableStateOf(true) }
     var overlayJob    by remember { mutableStateOf<Job?>(null) }
 
+    DisposableEffect(accessibility) {
+        val listener = android.view.accessibility.AccessibilityManager.AccessibilityStateChangeListener { enabled ->
+            accessibilityEnabled = enabled
+            if (enabled) { overlayJob?.cancel(); showOverlay = true }
+        }
+        accessibility.addAccessibilityStateChangeListener(listener)
+        onDispose { accessibility.removeAccessibilityStateChangeListener(listener) }
+    }
+
     // Seek-ripple feedback
     var seekRippleLeft  by remember { mutableStateOf(false) }
     var seekRippleRight by remember { mutableStateOf(false) }
@@ -114,8 +127,10 @@ fun VideoPlayerScreen(
     // Auto-hide overlay helpers
     fun scheduleHide() {
         overlayJob?.cancel()
+        if (accessibilityEnabled || showSpeedMenu || isSeeking) return
+        val timeout = recommendedTimeout?.calculateRecommendedTimeoutMillis(3_000L, containsIcons = true, containsText = true, containsControls = true) ?: 3_000L
         overlayJob = scope.launch {
-            delay(3_000)
+            delay(timeout)
             showOverlay = false
         }
     }
@@ -124,7 +139,10 @@ fun VideoPlayerScreen(
         scheduleHide()
     }
 
-    LaunchedEffect(Unit) { scheduleHide() }
+    LaunchedEffect(accessibilityEnabled, showSpeedMenu, isSeeking) {
+        if (accessibilityEnabled || showSpeedMenu || isSeeking) showOverlay = true
+        scheduleHide()
+    }
 
     // ── Root box ───────────────────────────────────────────────────────────
     Box(
@@ -134,6 +152,7 @@ fun VideoPlayerScreen(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = {
+                        if (accessibilityEnabled) return@detectTapGestures
                         if (showOverlay) { overlayJob?.cancel(); showOverlay = false }
                         else             { showAndScheduleHide() }
                     },
