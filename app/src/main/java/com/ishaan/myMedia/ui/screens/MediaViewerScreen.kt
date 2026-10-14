@@ -38,6 +38,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -328,7 +329,12 @@ fun ThumbnailStrip(
                     .graphicsLayer { scaleX = scale; scaleY = scale }
                     .clip(RoundedCornerShape(6.dp))
                     .then(if (border != null) Modifier.border(border, RoundedCornerShape(6.dp)) else Modifier)
-                    .clickable { onThumbnailClick(idx) }
+                    .semantics {
+                        contentDescription = "Media ${idx + 1} of ${items.size}: ${item.name}, ${item.mediaType.name.lowercase()}"
+                        selected = isCurrent
+                        stateDescription = if (isCurrent) "Current media" else "Not current"
+                    }
+                    .clickable(role = Role.Button, onClickLabel = "Open media") { onThumbnailClick(idx) }
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)

@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -86,11 +87,21 @@ fun MediaThumbnail(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
+            .semantics {
+                contentDescription = "${item.name}, ${item.mediaType.name.lowercase()}"
+                if (selectionActive) {
+                    role = Role.Checkbox
+                    selected = isSelected
+                    stateDescription = if (isSelected) "Selected" else "Not selected"
+                }
+            }
             .then(
                 if (onClick != null || onLongClick != null)
                     Modifier.combinedClickable(
+                        onClickLabel = if (selectionActive) { if (isSelected) "Deselect media" else "Select media" } else "Open media",
+                        onLongClickLabel = "Select media",
                         onClick = { onClick?.invoke() },
-                        onLongClick = { onLongClick?.invoke() },
+                        onLongClick = onLongClick,
                     )
                 else Modifier
             )
@@ -112,7 +123,7 @@ fun MediaThumbnail(
                 .memoryCacheKey(item.id.toString())
                 .diskCacheKey(item.id.toString())
                 .build(),
-            contentDescription = item.name,
+            contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
             loading = {
@@ -144,7 +155,7 @@ fun MediaThumbnail(
             ) {
                 Icon(
                     Icons.Rounded.CheckCircle,
-                    contentDescription = "Selected",
+                    contentDescription = null,
                     tint = AccentForeground,
                     modifier = Modifier.fillMaxSize().padding(2.dp),
                 )

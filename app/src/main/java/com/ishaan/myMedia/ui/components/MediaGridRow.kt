@@ -35,7 +35,7 @@ fun MediaGridRow(
                     isSelected      = item.id in selectedIds,
                     selectionActive = selectionActive,
                     onClick         = { onItemClick(item) },
-                    onLongClick     = { onItemLongClick?.invoke(item) },
+                    onLongClick     = onItemLongClick?.let { handler -> { handler(item) } },
                 )
             } else {
                 Spacer(modifier = Modifier.size(cellSize))

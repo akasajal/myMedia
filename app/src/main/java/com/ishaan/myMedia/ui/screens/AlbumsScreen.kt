@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -193,7 +194,11 @@ fun AlbumCard(
         modifier = Modifier
             .aspectRatio(1f)
             .clip(RoundedCornerShape(16.dp))
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .semantics {
+                contentDescription = "${album.name}, ${album.mediaCount} items"
+                stateDescription = if (isPinned) "Pinned" else "Not pinned"
+            }
+            .combinedClickable(role = Role.Button, onClickLabel = "Open album", onLongClickLabel = if (isPinned) "Unpin album" else "Pin album", onClick = onClick, onLongClick = onLongClick)
     ) {
         if (album.coverUri != null) {
             AsyncImage(
@@ -201,7 +206,7 @@ fun AlbumCard(
                     .data(album.coverUri)
                     .crossfade(true)
                     .build(),
-                contentDescription = album.name,
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -242,7 +247,7 @@ fun AlbumCard(
 
         Icon(
             imageVector        = Icons.Rounded.PushPin,
-            contentDescription = if (isPinned) "Pinned" else "Long-press to pin",
+            contentDescription = null,
             tint               = pinTint,
             modifier           = Modifier
                 .align(Alignment.TopEnd)
