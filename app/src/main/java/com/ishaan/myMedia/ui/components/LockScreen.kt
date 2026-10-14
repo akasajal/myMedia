@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -22,6 +23,7 @@ fun LockScreen(
     onUnlocked: () -> Unit
 ) {
     var currentInput by remember { mutableStateOf("") }
+    var errorText by remember { mutableStateOf("") }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -52,6 +54,10 @@ fun LockScreen(
             
             // PIN dots
             Row(
+                modifier = Modifier.clearAndSetSemantics {
+                    contentDescription = "PIN entry"
+                    stateDescription = "${currentInput.length} of 4 digits entered"
+                },
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 repeat(4) { index ->
@@ -69,9 +75,14 @@ fun LockScreen(
             }
             
             Spacer(Modifier.height(48.dp))
+            if (errorText.isNotEmpty()) Text(
+                errorText, color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
             
             NumericKeypad(
                 onNumberClick = { num ->
+                    errorText = ""
                     if (currentInput.length < 4) {
                         currentInput += num
                         if (currentInput.length == 4) {
@@ -79,7 +90,7 @@ fun LockScreen(
                                 onUnlocked()
                             } else {
                                 currentInput = ""
-                                // Trigger error state (could add haptics here)
+                                errorText = "Incorrect PIN. Try again."
                             }
                         }
                     }

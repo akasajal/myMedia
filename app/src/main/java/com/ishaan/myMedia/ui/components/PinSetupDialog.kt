@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,10 @@ fun PinSetupDialog(
                 
                 // PIN dots
                 Row(
+                    modifier = Modifier.clearAndSetSemantics {
+                        contentDescription = "PIN entry"
+                        stateDescription = "${currentInput.length} of 4 digits entered"
+                    },
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     repeat(4) { index ->
@@ -65,7 +70,7 @@ fun PinSetupDialog(
                         text = errorText,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(top = 16.dp)
+                        modifier = Modifier.padding(top = 16.dp).semantics { liveRegion = LiveRegionMode.Polite }
                     )
                 }
                 
@@ -138,7 +143,7 @@ fun NumericKeypad(
                             onClick = onBackspaceClick,
                             modifier = Modifier.size(64.dp)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Backspace, null)
+                            Icon(Icons.AutoMirrored.Filled.Backspace, "Delete last digit")
                         }
                     } else {
                         Surface(
