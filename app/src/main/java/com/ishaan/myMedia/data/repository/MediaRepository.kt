@@ -301,12 +301,18 @@ class MediaRepository(private val context: Context) {
                 return@withContext true
             }
         } catch (e: Exception) {
-            // Cross-provider move might fail, fallback to copy + delete
-            if (copyMedia(item, targetParentUri)) {
-                permanentlyDeleteFromStorage(item)
-                removeFromCache(item)
-                return@withContext true
-            }
+            // A provider may require copying instead of a native move.
+        }
+        var copiedUri: Uri? = null
+        try {
+            copiedUri = DocumentsContract.copyDocument(context.contentResolver, documentItem.uri, targetParentUri)
+                ?: return@withContext false
+            check(DocumentsContract.deleteDocument(context.contentResolver, documentItem.uri)) { "Could not remove the original file" }
+            removeFromCache(item)
+            return@withContext true
+        } catch (_: Exception) {
+            // Roll back only the copy created by this operation; preserve the original.
+            copiedUri?.let { runCatching { DocumentsContract.deleteDocument(context.contentResolver, it) } }
         }
         false
     }
@@ -331,6 +337,9 @@ class MediaRepository(private val context: Context) {
         val identity = mediaIdentity(item.uri, item.albumId, item.name)
         return getSafCache().firstOrNull {
             it.parentUri != null && mediaIdentity(it.uri, it.albumId, it.name) == identity
+        } ?: folderUriForPath(item.albumId)?.let { folderUri ->
+            val documentUri = documentUriForMedia(item.uri, item.albumId, item.name)
+            if (documentUri != item.uri) item.copy(uri = documentUri, parentUri = folderUri) else item
         } ?: item
     }
 
@@ -342,8 +351,12 @@ class MediaRepository(private val context: Context) {
         }
     }
 
-    private fun permanentlyDeleteFromStorage(item: MediaItem) {
-        try { context.contentResolver.delete(item.uri, null, null) } catch (_: Exception) {}
+    private fun documentUriForMedia(uri: Uri, folder: String, name: String): Uri {
+        if (DocumentsContract.isDocumentUri(context, uri)) return uri
+        val parent = folderUriForPath(folder) ?: return uri
+        if (parent.authority != "com.android.externalstorage.documents") return uri
+        val parentId = DocumentsContract.getDocumentId(parent)
+        return DocumentsContract.buildDocumentUriUsingTree(parent, parentId + (if (parentId.endsWith(':')) "" else "/") + name)
     }
 
     suspend fun refreshSafMedia(): List<MediaItem> = withContext(Dispatchers.IO) {
@@ -766,7 +779,10 @@ class MediaRepository(private val context: Context) {
     }
 
     fun permanentlyDelete(item: DeletedItem) {
-        check(context.contentResolver.delete(item.uri, null, null) > 0) { "Could not delete media" }
+        val uri = documentUriForMedia(item.uri, item.originalAlbumId, item.name)
+        val deleted = if (DocumentsContract.isDocumentUri(context, uri)) DocumentsContract.deleteDocument(context.contentResolver, uri)
+            else context.contentResolver.delete(uri, null, null) > 0
+        check(deleted) { "Could not delete media" }
         val raw = prefs.getStringSet("recycle_bin", emptySet())!!.toMutableSet()
         raw.removeAll { deserializeDeleted(it)?.id == item.id }
         prefs.edit().putStringSet("recycle_bin", raw).apply()

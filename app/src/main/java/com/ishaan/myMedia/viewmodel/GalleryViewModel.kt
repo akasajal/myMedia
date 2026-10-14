@@ -335,6 +335,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveEditedImage(original: MediaItem, bitmap: Bitmap, onResult: (Uri?) -> Unit) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            var pendingUri: Uri? = null
             try {
                 val baseName = original.name.substringBeforeLast(".")
                 val displayName = "${baseName}_edited_${System.currentTimeMillis()}.jpg"
@@ -350,6 +351,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
                 val resolver = getApplication<Application>().contentResolver
                 val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                pendingUri = uri
 
                 if (uri != null) {
                     requireNotNull(resolver.openOutputStream(uri)) { "Could not open image for writing" }.use { stream ->
@@ -368,6 +370,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 if (uri != null) loadMedia()
             } catch (e: Exception) {
                 e.printStackTrace()
+                pendingUri?.let { uri -> runCatching { getApplication<Application>().contentResolver.delete(uri, null, null) } }
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onResult(null)
                 }
