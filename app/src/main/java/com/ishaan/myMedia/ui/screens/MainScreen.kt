@@ -33,9 +33,13 @@ val navItems = listOf(
     NavItem(NavTab.SETTINGS,  "Settings",  Icons.Rounded.Settings),
 )
 
+enum class ViewerCollection { MEDIA, ALBUM, FAVORITES }
+
 data class ViewerState(
     val items: List<MediaItem>,
     val index: Int,
+    val collection: ViewerCollection = ViewerCollection.MEDIA,
+    val albumId: String? = null,
 )
 
 @Composable
@@ -60,9 +64,15 @@ fun MainScreen(viewModel: GalleryViewModel) {
     // Viewer
     var viewerState by remember { mutableStateOf<ViewerState?>(null) }
 
-    LaunchedEffect(uiState.allMedia) {
+    LaunchedEffect(uiState.allMedia, uiState.favorites) {
         val vs = viewerState ?: return@LaunchedEffect
-        val newItems = uiState.allMedia
+        val ordered = uiState.mediaGroups.flatMap { it.items }
+        val favoriteIds = uiState.favorites.map { it.id }.toSet()
+        val newItems = when (vs.collection) {
+            ViewerCollection.MEDIA -> ordered
+            ViewerCollection.ALBUM -> ordered.filter { it.albumId == vs.albumId }
+            ViewerCollection.FAVORITES -> ordered.filter { it.id in favoriteIds }
+        }
         if (newItems == vs.items) return@LaunchedEffect
         val currentId = vs.items.getOrNull(vs.index)?.id
         val newIndex = if (currentId != null) newItems.indexOfFirst { it.id == currentId } else -1
@@ -285,6 +295,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
         MediaViewerScreen(
             items         = vs.items,
             initialIndex  = vs.index,
+            onCurrentIndexChange = { index -> viewerState = viewerState?.copy(index = index) },
             onBack        = { viewerState = null },
             onToggleFavorite = { item ->
                 viewModel.toggleFavorite(item)
@@ -319,7 +330,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
             onBack            = { activeAlbum = null },
             onMediaClick      = { item, items, idx ->
                 viewModel.loadMetadataFor(item)
-                viewerState = ViewerState(items, idx)
+                viewerState = ViewerState(items, idx, ViewerCollection.ALBUM, album.id)
             },
             columns           = uiState.gridColumns,
             onColumnsChange   = viewModel::updateGridColumns,
@@ -455,7 +466,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
                     uiState         = uiState,
                     onMediaClick    = { item, items, idx ->
                         viewModel.loadMetadataFor(item)
-                        viewerState = ViewerState(items, idx)
+                        viewerState = ViewerState(items, idx, ViewerCollection.FAVORITES)
                     },
                     columns         = uiState.gridColumns,
                     onColumnsChange = viewModel::updateGridColumns,

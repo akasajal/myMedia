@@ -71,6 +71,7 @@ fun MediaViewerScreen(
     onMove: (MediaItem) -> Unit,
     onPlayVideo: (MediaItem) -> Unit,
     onEdit: (MediaItem) -> Unit,
+    onCurrentIndexChange: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val pagerState    = rememberPagerState(initialPage = initialIndex) { items.size }
@@ -78,6 +79,13 @@ fun MediaViewerScreen(
     val scope         = rememberCoroutineScope()
     var showOverlay   by remember { mutableStateOf(false) }
     var showInfo      by remember { mutableStateOf(false) }
+    val currentIndexChange by rememberUpdatedState(onCurrentIndexChange)
+
+    LaunchedEffect(initialIndex, items.map { it.id }) {
+        if (items.isNotEmpty() && pagerState.currentPage != initialIndex) {
+            pagerState.scrollToPage(initialIndex.coerceIn(items.indices))
+        }
+    }
 
     val currentItem = items.getOrNull(pagerState.currentPage) ?: return
     var isImageZoomed by remember(currentItem.uri) { mutableStateOf(false) }
@@ -103,6 +111,7 @@ fun MediaViewerScreen(
     // Sync strip when pager changes
     LaunchedEffect(pagerState.currentPage) {
         val page = pagerState.currentPage
+        currentIndexChange(page)
         val stripCenter = maxOf(0, page - 3)
         stripState.animateScrollToItem(stripCenter)
     }
