@@ -241,7 +241,12 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 val currentMedia = _uiState.value.allMedia.map {
                     if (it.id == item.id) updated else it
                 }
-                _uiState.update { it.copy(allMedia = currentMedia) }
+                _uiState.update { state -> state.copy(
+                    allMedia = currentMedia,
+                    rawMedia = state.rawMedia.map { if (it.id == item.id) updated else it },
+                    mediaGroups = repo.groupByDate(currentMedia),
+                    favorites = currentMedia.filter { it.isFavorite },
+                ) }
             }
         }
     }
@@ -290,7 +295,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         val updatedRaw = _uiState.value.rawMedia.map {
             if (it.id == item.id) it.copy(isFavorite = !it.isFavorite) else it
         }
-        _uiState.update { it.copy(rawMedia = updatedRaw, allMedia = updated, favorites = updated.filter { m -> m.isFavorite }) }
+        _uiState.update { it.copy(rawMedia = updatedRaw, allMedia = updated, mediaGroups = repo.groupByDate(updated), favorites = updated.filter { m -> m.isFavorite }) }
     }
 
     fun deleteMedia(item: MediaItem) {

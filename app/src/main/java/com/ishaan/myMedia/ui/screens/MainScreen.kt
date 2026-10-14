@@ -113,7 +113,7 @@ private fun MainScreenContent(viewModel: GalleryViewModel, snackbarHostState: Sn
             ViewerCollection.ALBUM -> ordered.filter { it.albumId == vs.albumId }
             ViewerCollection.FAVORITES -> ordered.filter { it.id in favoriteIds }
         }
-        if (newItems == vs.items) return@LaunchedEffect
+        if (newItems == vs.items && vs.pendingMediaId == null) return@LaunchedEffect
         val currentId = vs.pendingMediaId ?: vs.items.getOrNull(vs.index)?.id
         val newIndex = if (currentId != null) newItems.indexOfFirst { it.id == currentId } else -1
         if (newIndex < 0) {
