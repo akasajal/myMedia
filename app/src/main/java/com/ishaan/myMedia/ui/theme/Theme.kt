@@ -23,15 +23,16 @@ val SoftPurple: Color
     @Composable get() = lerp(LocalAccent.current, Color.White, 0.55f)
 
 private fun galleryColors(darkTheme: Boolean, accent: Color): ColorScheme {
-    val strong = lerp(accent, Color.Black, 0.42f)
+    val primaryAccent = lerp(accent, Color.White, 0.35f)
+    val secondaryAccent = lerp(accent, Color.White, 0.55f)
     val pale = lerp(accent, Color.White, 0.80f)
     val deep = lerp(accent, Color.Black, 0.65f)
     return if (darkTheme) darkColorScheme(
-        primary = lerp(accent, Color.White, 0.35f),
+        primary = primaryAccent,
         onPrimary = deep,
         primaryContainer = deep,
         onPrimaryContainer = pale,
-        secondary = lerp(accent, Color.White, 0.55f),
+        secondary = secondaryAccent,
         onSecondary = deep,
         secondaryContainer = lerp(accent, Color.Black, 0.75f),
         onSecondaryContainer = pale,
@@ -48,16 +49,16 @@ private fun galleryColors(darkTheme: Boolean, accent: Color): ColorScheme {
         outline = Color(0xFF938D9B),
         outlineVariant = Color(0xFF45414B),
     ) else lightColorScheme(
-        primary = strong,
-        onPrimary = Color.White,
+        primary = primaryAccent,
+        onPrimary = deep,
         primaryContainer = pale,
         onPrimaryContainer = deep,
-        secondary = strong,
-        onSecondary = Color.White,
+        secondary = secondaryAccent,
+        onSecondary = deep,
         secondaryContainer = lerp(accent, Color.White, 0.90f),
         onSecondaryContainer = deep,
-        tertiary = strong,
-        onTertiary = Color.White,
+        tertiary = accent,
+        onTertiary = Color.Black,
         tertiaryContainer = pale,
         onTertiaryContainer = deep,
         background = Color(0xFFFAF8FB),
