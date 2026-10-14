@@ -10,6 +10,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,12 +42,14 @@ data class ViewerState(
     val index: Int,
     val collection: ViewerCollection = ViewerCollection.MEDIA,
     val albumId: String? = null,
+    val pendingMediaId: Long? = null,
 )
 
 @Composable
 fun MainScreen(viewModel: GalleryViewModel) {
     val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
-    var activeTab   by remember { mutableStateOf(NavTab.MEDIA) }
+    var activeTab   by rememberSaveable { mutableStateOf(NavTab.MEDIA) }
+    var albumSortOrder by rememberSaveable { mutableStateOf(AlbumSortOrder.NAME_ASC) }
 
     // Hoisted scroll state — survives viewer open/close
     val mediaListState = rememberLazyListState()
@@ -53,18 +57,29 @@ fun MainScreen(viewModel: GalleryViewModel) {
     val settingsListState = rememberLazyListState()
     val albumsGridState = rememberLazyGridState()
 
-    var selection by remember { mutableStateOf(SelectionState()) }
-    var albumSelection by remember { mutableStateOf(SelectionState()) }
+    val selectionSaver = Saver<SelectionState, LongArray>(save = { it.selectedIds.toLongArray() }, restore = { SelectionState(it.toSet()) })
+    var selection by rememberSaveable(stateSaver = selectionSaver) { mutableStateOf(SelectionState()) }
+    var albumSelection by rememberSaveable(stateSaver = selectionSaver) { mutableStateOf(SelectionState()) }
 
-    var activeAlbum by remember { mutableStateOf<Album?>(null) }
+    var activeAlbumId by rememberSaveable { mutableStateOf<String?>(null) }
+    val activeAlbum = uiState.albums.firstOrNull { it.id == activeAlbumId }
 
     // Keep the album's position while the viewer is shown; reset for a different album.
-    val albumListState = key(activeAlbum?.id) { rememberLazyListState() }
+    val albumListState = key(activeAlbumId) { rememberLazyListState() }
 
     // Viewer
-    var viewerState by remember { mutableStateOf<ViewerState?>(null) }
+    val viewerSaver = Saver<ViewerState?, List<String>>(
+        save = { value -> value?.let { state ->
+            (state.pendingMediaId ?: state.items.getOrNull(state.index)?.id)?.let { id ->
+                listOf(state.collection.name, state.albumId.orEmpty(), id.toString())
+            }
+        } },
+        restore = { saved -> ViewerState(emptyList(), 0, ViewerCollection.valueOf(saved[0]), saved[1].ifEmpty { null }, saved[2].toLong()) },
+    )
+    var viewerState by rememberSaveable(stateSaver = viewerSaver) { mutableStateOf<ViewerState?>(null) }
 
-    LaunchedEffect(uiState.allMedia, uiState.favorites) {
+    LaunchedEffect(uiState.allMedia, uiState.favorites, uiState.isLoading) {
+        if (uiState.isLoading) return@LaunchedEffect
         val vs = viewerState ?: return@LaunchedEffect
         val ordered = uiState.mediaGroups.flatMap { it.items }
         val favoriteIds = uiState.favorites.map { it.id }.toSet()
@@ -74,22 +89,24 @@ fun MainScreen(viewModel: GalleryViewModel) {
             ViewerCollection.FAVORITES -> ordered.filter { it.id in favoriteIds }
         }
         if (newItems == vs.items) return@LaunchedEffect
-        val currentId = vs.items.getOrNull(vs.index)?.id
+        val currentId = vs.pendingMediaId ?: vs.items.getOrNull(vs.index)?.id
         val newIndex = if (currentId != null) newItems.indexOfFirst { it.id == currentId } else -1
         if (newIndex < 0) {
             viewerState = null
         } else {
-            viewerState = vs.copy(items = newItems, index = newIndex)
+            viewerState = vs.copy(items = newItems, index = newIndex, pendingMediaId = null)
         }
     }
 
-    var showRecycleBin   by remember { mutableStateOf(false) }
-    var showMediaFolders by remember { mutableStateOf(false) }
+    var showRecycleBin   by rememberSaveable { mutableStateOf(false) }
+    var showMediaFolders by rememberSaveable { mutableStateOf(false) }
 
     var itemToDelete by remember { mutableStateOf<MediaItem?>(null) }
     var itemToMove   by remember { mutableStateOf<MediaItem?>(null) }
-    var playingVideo by remember { mutableStateOf<MediaItem?>(null) }
-    var editingItem  by remember { mutableStateOf<MediaItem?>(null) }
+    var playingVideoId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editingItemId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val playingVideo = uiState.allMedia.firstOrNull { it.id == playingVideoId }
+    val editingItem = uiState.allMedia.firstOrNull { it.id == editingItemId }
     var saveResult   by remember { mutableStateOf<String?>(null) }
 
     // Bulk action state
@@ -102,19 +119,19 @@ fun MainScreen(viewModel: GalleryViewModel) {
         if (activeTab != NavTab.MEDIA) selection = SelectionState()
     }
 
-    LaunchedEffect(activeAlbum) {
-        if (activeAlbum == null) albumSelection = SelectionState()
+    LaunchedEffect(activeAlbumId) {
+        if (activeAlbumId == null) albumSelection = SelectionState()
     }
 
     BackHandler(enabled = selection.isActive || albumSelection.isActive || editingItem != null || itemToMove != null || playingVideo != null || viewerState != null || activeAlbum != null || showRecycleBin || showMediaFolders || activeTab != NavTab.MEDIA) {
         when {
             albumSelection.isActive -> albumSelection = SelectionState()
             selection.isActive  -> selection = SelectionState()
-            editingItem != null -> editingItem = null
+            editingItem != null -> editingItemId = null
             itemToMove  != null -> itemToMove = null
-            playingVideo != null -> playingVideo = null
+            playingVideo != null -> playingVideoId = null
             viewerState != null -> viewerState = null
-            activeAlbum != null -> activeAlbum = null
+            activeAlbum != null -> activeAlbumId = null
             showRecycleBin      -> showRecycleBin = false
             showMediaFolders    -> showMediaFolders = false
             activeTab != NavTab.MEDIA -> activeTab = NavTab.MEDIA
@@ -272,10 +289,10 @@ fun MainScreen(viewModel: GalleryViewModel) {
     editingItem?.let { item ->
         ImageEditorScreen(
             item   = item,
-            onBack = { editingItem = null },
+            onBack = { editingItemId = null },
             onSave = { bitmap ->
                 viewModel.saveEditedImage(item, bitmap) { uri ->
-                    editingItem = null
+                    editingItemId = null
                     saveResult = if (uri != null) "Saved to Pictures/myMedia" else "Save failed"
                 }
             }
@@ -287,7 +304,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
         if (playingVideo != null) {
             VideoPlayerScreen(
                 item   = playingVideo!!,
-                onBack = { playingVideo = null }
+                onBack = { playingVideoId = null }
             )
             return
         }
@@ -314,9 +331,9 @@ fun MainScreen(viewModel: GalleryViewModel) {
                 }
                 context.startActivity(Intent.createChooser(shareIntent, "Share with"))
             },
-            onPlayVideo = { item -> playingVideo = item },
+            onPlayVideo = { item -> playingVideoId = item.id },
             onMove      = { item -> itemToMove = item },
-            onEdit      = { item -> editingItem = item },
+            onEdit      = { item -> editingItemId = item.id },
         )
         return
     }
@@ -327,7 +344,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
             album             = album,
             listState         = albumListState,
             groups            = groups,
-            onBack            = { activeAlbum = null },
+            onBack            = { activeAlbumId = null },
             onMediaClick      = { item, items, idx ->
                 viewModel.loadMetadataFor(item)
                 viewerState = ViewerState(items, idx, ViewerCollection.ALBUM, album.id)
@@ -455,10 +472,12 @@ fun MainScreen(viewModel: GalleryViewModel) {
                     onBulkMove      = { showBulkMoveSheet = true },
                 )
                 NavTab.ALBUMS -> AlbumsScreen(
+                    sortOrder = albumSortOrder,
+                    onSortOrderChange = { albumSortOrder = it },
                     onCreateAlbum = viewModel::createAlbum,
                     gridState       = albumsGridState,
                     uiState         = uiState,
-                    onAlbumClick    = { activeAlbum = it },
+                    onAlbumClick    = { activeAlbumId = it.id },
                     pinnedAlbumIds  = uiState.pinnedAlbumIds,
                     onTogglePin     = { viewModel.togglePinAlbum(it.id) },
                 )

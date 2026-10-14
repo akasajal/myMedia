@@ -25,6 +25,8 @@ import androidx.compose.material.icons.automirrored.rounded.RotateRight
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -150,16 +152,18 @@ fun ImageEditorScreen(
     val scope = rememberCoroutineScope()
 
     // Tool state
-    var activeTool by remember { mutableStateOf(EditorTool.FILTERS) }
+    var activeTool by rememberSaveable(item.uri.toString()) { mutableStateOf(EditorTool.FILTERS) }
 
     // Filter state
-    var selectedFilter by remember { mutableStateOf(photoFilters[0]) }
+    var filterIndex by rememberSaveable(item.uri.toString()) { mutableIntStateOf(0) }
+    val selectedFilter = photoFilters[filterIndex]
 
     // Rotate state — cumulative rotation in 90° steps
-    var rotationDegrees by remember { mutableIntStateOf(0) }
+    var rotationDegrees by rememberSaveable(item.uri.toString()) { mutableIntStateOf(0) }
 
     // Crop state (normalised 0..1 rect relative to displayed image bounds)
-    var cropRect by remember { mutableStateOf(Rect(0f, 0f, 1f, 1f)) }
+    val cropSaver = Saver<Rect, List<Float>>(save = { listOf(it.left, it.top, it.right, it.bottom) }, restore = { Rect(it[0], it[1], it[2], it[3]) })
+    var cropRect by rememberSaveable(item.uri.toString(), stateSaver = cropSaver) { mutableStateOf(Rect(0f, 0f, 1f, 1f)) }
     var cropApplied by remember { mutableStateOf(false) } // tracks if user has moved handles
 
     // Saving
@@ -294,7 +298,7 @@ fun ImageEditorScreen(
                         item = item,
                         filters = photoFilters,
                         selectedFilter = selectedFilter,
-                        onFilterSelect = { selectedFilter = it },
+                        onFilterSelect = { filterIndex = photoFilters.indexOf(it) },
                     )
                     EditorTool.CROP -> CropHintPanel(
                         cropRect = cropRect,

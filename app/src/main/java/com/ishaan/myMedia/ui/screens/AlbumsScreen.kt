@@ -51,12 +51,13 @@ fun AlbumsScreen(
     uiState: GalleryUiState,
     onAlbumClick: (Album) -> Unit,
     onCreateAlbum: (String, Album) -> Unit,
+    sortOrder: AlbumSortOrder,
+    onSortOrderChange: (AlbumSortOrder) -> Unit,
     pinnedAlbumIds: Set<String> = emptySet(),
     onTogglePin: (Album) -> Unit = {},
     modifier: Modifier = Modifier,
     gridState: LazyGridState = rememberLazyGridState(),
 ) {
-    var sortOrder by remember { mutableStateOf(AlbumSortOrder.NAME_ASC) }
     var showCreateDialog by remember { mutableStateOf(false) }
 
     if (uiState.isLoading) {
@@ -86,7 +87,7 @@ fun AlbumsScreen(
         Column(Modifier.fillMaxSize()) {
             AlbumSortBar(
                 current  = sortOrder,
-                onChange = { sortOrder = it },
+                onChange = onSortOrderChange,
             )
             LazyVerticalGrid(
                 state = gridState,
