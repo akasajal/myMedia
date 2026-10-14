@@ -418,7 +418,7 @@ fun MainScreen(viewModel: GalleryViewModel) {
                     uiState         = uiState,
                     onMediaClick    = { item, idx ->
                         viewModel.loadMetadataFor(item)
-                        viewerState = ViewerState(uiState.allMedia, idx)
+                        viewerState = ViewerState(uiState.mediaGroups.flatMap { it.items }, idx)
                     },
                     columns         = uiState.gridColumns,
                     onColumnsChange = viewModel::updateGridColumns,
