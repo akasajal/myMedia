@@ -109,30 +109,22 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val updatedSaf = repo.refreshSafMedia()
-                if (updatedSaf.isNotEmpty()) {
-                    // Update state with newly discovered items
-                    val currentMedia = _uiState.value.allMedia.toMutableList()
-                    val currentIds = currentMedia.map { it.id }.toSet()
-                    val deletedIds = _uiState.value.deletedItems.map { it.id }.toSet()
-
-                    val newItems = updatedSaf.filter {
-                        it.id !in currentIds && it.id !in deletedIds && repo.isFolderVisible(it.albumId)
-                    }
-
-                    if (newItems.isNotEmpty()) {
-                        currentMedia.addAll(newItems)
-                        currentMedia.sortByDescending { it.dateTaken }
-
-                        val currentRaw = _uiState.value.rawMedia.toMutableList()
-                        val currentRawIds = currentRaw.map { it.id }.toSet()
-                        currentRaw.addAll(updatedSaf.filter { it.id !in currentRawIds && it.id !in deletedIds })
-                        currentRaw.sortByDescending { it.dateTaken }
-
-                        val groups = repo.groupByDate(currentMedia)
-                        val albums = repo.buildAlbums(currentMedia)
-                        _uiState.update { it.copy(rawMedia = currentRaw, allMedia = currentMedia, mediaGroups = groups, albums = albums) }
-                    }
-                }
+                // Use the same file identity rules as the initial load, not source-specific IDs.
+                val rawMedia = repo.mergeMedia(_uiState.value.rawMedia + updatedSaf)
+                val media = rawMedia.filter { repo.isFolderVisible(it.albumId) }
+                val groups = repo.groupByDate(media)
+                val albums = repo.buildAlbums(media)
+                val allFolderPaths = rawMedia.map { it.albumId }.toSet()
+                _uiState.update { it.copy(
+                    rawMedia = rawMedia,
+                    allMedia = media,
+                    mediaGroups = groups,
+                    albums = albums,
+                    favorites = media.filter { item -> item.isFavorite },
+                    totalStorageUsage = repo.calculateStorageUsage(media),
+                    allFolderPaths = allFolderPaths,
+                    folderTree = repo.getFolderTree(allFolderPaths),
+                ) }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

@@ -205,18 +205,64 @@ class MediaRepository(private val context: Context) {
         items += queryMediaStore(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, MediaType.VIDEO, chosenFolders)
 
         // 2. Add cached SAF items immediately
-        val cachedSaf = getSafCache()
-        val deletedIds = getDeletedItems().map { it.id }.toSet()
-        val discoveredIds = items.map { it.id }.toSet()
-
-        items += cachedSaf.filter { it.id !in discoveredIds && it.id !in deletedIds }
+        items += getSafCache()
 
         // 3. Deduplicate and remove deleted — do NOT filter by visibility here.
         //    The ViewModel applies visibility so the folder tree always knows about
         //    hidden folders (they stay in the tree with a VisibilityOff icon).
-        val allItems = items.filter { it.id !in deletedIds }.distinctBy { it.id }  // Bug 2 fix: deduplicate by id, not name
+        mergeMedia(items)
+    }
 
-        sortItems(allItems, getSortOrder())
+    /** MediaStore and SAF can refer to the same file with different URIs and IDs. */
+    fun mergeMedia(items: List<MediaItem>): List<MediaItem> {
+        val deleted = getDeletedItems()
+        val deletedIds = deleted.map { it.id }.toSet()
+        val deletedFiles = deleted.map { mediaIdentity(it.uri, it.originalAlbumId, it.name) }.toSet()
+        val favoriteIds = _favoriteIds.value.toMutableSet()
+        val merged = items.groupBy { mediaIdentity(it.uri, it.albumId, it.name) }
+            .mapNotNull { (identity, aliases) ->
+                if (identity in deletedFiles || aliases.any { it.id in deletedIds }) return@mapNotNull null
+                // Keep indexed metadata (dimensions, date taken, video duration) when available.
+                val preferred = aliases.firstOrNull { it.uri.authority == "media" } ?: aliases.first()
+                val favorite = aliases.any { it.id in favoriteIds }
+                // Move a saved favorite from the discarded alias to the retained entry.
+                aliases.forEach { favoriteIds.remove(it.id) }
+                if (favorite) favoriteIds.add(preferred.id)
+                preferred.copy(isFavorite = favorite)
+            }
+        if (favoriteIds != _favoriteIds.value) {
+            _favoriteIds.value = favoriteIds
+            prefs.edit().putStringSet("favorites", favoriteIds.map { it.toString() }.toSet()).apply()
+        }
+        return sortItems(merged, getSortOrder())
+    }
+
+    private fun mediaIdentity(uri: Uri, folder: String, name: String): String {
+        if (uri.authority == "com.android.externalstorage.documents") {
+            try {
+                val documentId = DocumentsContract.getDocumentId(uri)
+                val volume = documentId.substringBefore(':')
+                val relative = documentId.substringAfter(':', "")
+                val root = if (volume.equals("primary", ignoreCase = true))
+                    android.os.Environment.getExternalStorageDirectory().absolutePath
+                else "/storage/$volume"
+                return "file:${File("$root/$relative").normalize().path}"
+            } catch (_: IllegalArgumentException) {
+                // Fall back to the URI if this is not a document URI.
+            }
+        } else if (uri.authority == "media" && folder.isNotBlank()) {
+            return "file:${File(folder, name).normalize().path}"
+        } else if (uri.scheme == "file") {
+            return "file:${File(uri.path.orEmpty()).normalize().path}"
+        } else {
+            try {
+                // A document may be reached through more than one selected parent tree.
+                return "document:${uri.authority}:${DocumentsContract.getDocumentId(uri)}"
+            } catch (_: IllegalArgumentException) {
+                // Unknown providers retain their distinct URI identities.
+            }
+        }
+        return "uri:$uri"
     }
 
     /** All folder paths that have media, regardless of visibility. */
@@ -237,24 +283,25 @@ class MediaRepository(private val context: Context) {
     }
 
     suspend fun moveMedia(item: MediaItem, targetParentUri: Uri): Boolean = withContext(Dispatchers.IO) {
-        if (item.parentUri == null) return@withContext false
+        val documentItem = findDocumentAlias(item)
+        if (documentItem.parentUri == null) return@withContext false
         try {
             // Attempt native move
             val result = DocumentsContract.moveDocument(
                 context.contentResolver,
-                item.uri,
-                item.parentUri,
+                documentItem.uri,
+                documentItem.parentUri,
                 targetParentUri
             )
             if (result != null) {
-                removeFromCache(item.id)
+                removeFromCache(item)
                 return@withContext true
             }
         } catch (e: Exception) {
             // Cross-provider move might fail, fallback to copy + delete
             if (copyMedia(item, targetParentUri)) {
                 permanentlyDeleteFromStorage(item)
-                removeFromCache(item.id)
+                removeFromCache(item)
                 return@withContext true
             }
         }
@@ -262,10 +309,11 @@ class MediaRepository(private val context: Context) {
     }
 
     suspend fun copyMedia(item: MediaItem, targetParentUri: Uri): Boolean = withContext(Dispatchers.IO) {
+        val documentItem = findDocumentAlias(item)
         try {
             val result = DocumentsContract.copyDocument(
                 context.contentResolver,
-                item.uri,
+                documentItem.uri,
                 targetParentUri
             )
             return@withContext result != null
@@ -275,9 +323,18 @@ class MediaRepository(private val context: Context) {
         false
     }
 
-    private fun removeFromCache(id: Long) {
+    private fun findDocumentAlias(item: MediaItem): MediaItem {
+        if (item.parentUri != null) return item
+        val identity = mediaIdentity(item.uri, item.albumId, item.name)
+        return getSafCache().firstOrNull {
+            it.parentUri != null && mediaIdentity(it.uri, it.albumId, it.name) == identity
+        } ?: item
+    }
+
+    private fun removeFromCache(item: MediaItem) {
+        val identity = mediaIdentity(item.uri, item.albumId, item.name)
         val currentSaf = getSafCache().toMutableList()
-        if (currentSaf.removeAll { it.id == id }) {
+        if (currentSaf.removeAll { mediaIdentity(it.uri, it.albumId, it.name) == identity }) {
             saveSafCache(currentSaf)
         }
     }
@@ -303,8 +360,9 @@ class MediaRepository(private val context: Context) {
             }
         }
 
-        saveSafCache(allDiscovered)
-        allDiscovered
+        val uniqueItems = mergeMedia(allDiscovered)
+        saveSafCache(uniqueItems)
+        uniqueItems
     }
 
     fun loadMetadata(item: MediaItem): MediaItem {
@@ -529,10 +587,10 @@ class MediaRepository(private val context: Context) {
     }
 
     private fun isUnderChosenFolder(filePath: String, chosenFolders: Set<String>): Boolean =
-        chosenFolders.any { folder -> filePath.startsWith(folder) }
+        chosenFolders.any { folder -> filePath.startsWith("${folder.trimEnd('/')}/") }
 
     private fun getRelativePath(filePath: String, chosenFolders: Set<String>): String {
-        val matchingRoot = chosenFolders.firstOrNull { filePath.startsWith(it) } ?: return ""
+        val matchingRoot = chosenFolders.firstOrNull { filePath.startsWith("${it.trimEnd('/')}/") } ?: return ""
         val relative = filePath.removePrefix(matchingRoot).trimStart('/')
         val parentDir = relative.substringBeforeLast('/', "")
         return if (parentDir.isEmpty()) matchingRoot else "$matchingRoot/$parentDir"
@@ -652,8 +710,9 @@ class MediaRepository(private val context: Context) {
         prefs.edit().putStringSet("recycle_bin", raw).apply()
 
         // Also remove from SAF cache
+        val identity = mediaIdentity(item.uri, item.originalAlbumId, item.name)
         val currentSaf = getSafCache().toMutableList()
-        if (currentSaf.removeAll { it.id == item.id }) {
+        if (currentSaf.removeAll { mediaIdentity(it.uri, it.albumId, it.name) == identity }) {
             saveSafCache(currentSaf)
         }
 
