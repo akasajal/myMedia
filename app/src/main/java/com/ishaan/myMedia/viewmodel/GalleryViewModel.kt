@@ -13,6 +13,8 @@ import com.ishaan.myMedia.data.repository.MediaRepository
 import com.ishaan.myMedia.data.repository.PrivacyRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class GalleryUiState(
     val isLoading: Boolean = true,
@@ -32,6 +34,8 @@ data class GalleryUiState(
     val sortOrder: SortOrder = SortOrder.DATE_DESC,
     val totalStorageUsage: Long = 0L,
     val errorMessage: String? = null,
+    val operationBusy: Boolean = false,
+    val operationMessage: String? = null,
     val privacyPrefs: PrivacyPrefs = PrivacyPrefs(),
     val isLocked: Boolean = false,
     val pinnedAlbumIds: Set<String> = emptySet(),
@@ -41,6 +45,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo        = MediaRepository(app)
     private val privacyRepo = PrivacyRepository(app)
+    private val operationMutex = Mutex()
 
     private val _uiState = MutableStateFlow(GalleryUiState())
     val uiState: StateFlow<GalleryUiState> = _uiState.asStateFlow()
@@ -244,19 +249,35 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     fun setViewerIndex(index: Int) { _viewerIndex.value = index }
 
     fun moveMedia(item: MediaItem, destination: Album) {
-        viewModelScope.launch {
-            val targetUri = destination.folderUri ?: return@launch
-            if (repo.moveMedia(item, targetUri)) {
-                loadMedia()
-            }
-        }
+        organizeMedia(listOf(item), destination, copy = false)
     }
 
     fun copyMedia(item: MediaItem, destination: Album) {
+        organizeMedia(listOf(item), destination, copy = true)
+    }
+
+    fun clearFeedback() { _uiState.update { it.copy(errorMessage = null, operationMessage = null) } }
+
+    fun organizeMedia(items: List<MediaItem>, destination: Album, copy: Boolean) {
         viewModelScope.launch {
-            val targetUri = destination.folderUri ?: return@launch
-            if (repo.copyMedia(item, targetUri)) {
-                loadMedia()
+            operationMutex.withLock {
+                _uiState.update { it.copy(operationBusy = true, operationMessage = null) }
+                try {
+                    val targetUri = requireNotNull(destination.folderUri) { "Choose a destination folder with write access" }
+                    var completed = 0
+                    items.forEach { item ->
+                        if (if (copy) repo.copyMedia(item, targetUri) else repo.moveMedia(item, targetUri)) completed++
+                    }
+                    val action = if (copy) "Copied" else "Moved"
+                    val failed = items.size - completed
+                    _uiState.update { it.copy(operationMessage = "$action $completed of ${items.size} items." +
+                        if (failed > 0) " $failed failed. Check folder access and try again." else "") }
+                    if (completed > 0) loadMedia()
+                } catch (e: Exception) {
+                    _uiState.update { it.copy(operationMessage = e.message ?: "Operation failed. Check folder access and try again.") }
+                } finally {
+                    _uiState.update { it.copy(operationBusy = false) }
+                }
             }
         }
     }
@@ -297,8 +318,14 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun permanentlyDelete(item: DeletedItem) {
-        repo.permanentlyDelete(item)
-        _uiState.update { it.copy(deletedItems = repo.getDeletedItems()) }
+        viewModelScope.launch {
+            try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repo.permanentlyDelete(item) }
+                _uiState.update { it.copy(deletedItems = repo.getDeletedItems(), operationMessage = "Deleted ${item.name}") }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(operationMessage = "Could not delete ${item.name}. Check folder access and try again.") }
+            }
+        }
     }
 
     fun saveEditedImage(original: MediaItem, bitmap: Bitmap, onResult: (Uri?) -> Unit) {
@@ -320,8 +347,8 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
 
                 if (uri != null) {
-                    resolver.openOutputStream(uri)?.use { stream ->
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
+                    requireNotNull(resolver.openOutputStream(uri)) { "Could not open image for writing" }.use { stream ->
+                        check(bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) { "Could not write image" }
                     }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         contentValues.clear()
@@ -401,7 +428,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 repo.createAlbum(name, parent)
                 loadMedia()
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.message ?: "Could not create album") }
+                _uiState.update { it.copy(operationMessage = e.message ?: "Could not create album. Check folder access and try again.") }
             }
         }
     }

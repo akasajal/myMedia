@@ -48,6 +48,22 @@ data class ViewerState(
 @Composable
 fun MainScreen(viewModel: GalleryViewModel) {
     val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
+    if (uiState.operationBusy) AlertDialog(
+        onDismissRequest = {}, title = { Text("Organizing media") },
+        text = { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(); Spacer(Modifier.width(16.dp)); Text("Please wait…") } },
+        confirmButton = {},
+    )
+    uiState.operationMessage?.let { message -> AlertDialog(
+        onDismissRequest = viewModel::clearFeedback,
+        title = { Text("Media operation") }, text = { Text(message) },
+        confirmButton = { TextButton(onClick = viewModel::clearFeedback) { Text("OK") } },
+    ) }
+    uiState.errorMessage?.let { message -> AlertDialog(
+        onDismissRequest = viewModel::clearFeedback,
+        title = { Text("Could not load media") }, text = { Text(message) },
+        confirmButton = { TextButton(onClick = { viewModel.clearFeedback(); viewModel.loadMedia() }) { Text("Retry") } },
+        dismissButton = { TextButton(onClick = viewModel::clearFeedback) { Text("Dismiss") } },
+    ) }
     var activeTab   by rememberSaveable { mutableStateOf(NavTab.MEDIA) }
     var albumSortOrder by rememberSaveable { mutableStateOf(AlbumSortOrder.NAME_ASC) }
 
@@ -194,16 +210,12 @@ fun MainScreen(viewModel: GalleryViewModel) {
                 albums    = uiState.destinationAlbums,
                 onDismiss = { showAlbumBulkMoveSheet = false },
                 onMove    = { dest ->
-                    albumSelection.selectedIds.forEach { id ->
-                        uiState.allMedia.firstOrNull { it.id == id }?.let { viewModel.moveMedia(it, dest) }
-                    }
+                    viewModel.organizeMedia(uiState.allMedia.filter { it.id in albumSelection.selectedIds }, dest, copy = false)
                     albumSelection = SelectionState()
                     showAlbumBulkMoveSheet = false
                 },
                 onCopy    = { dest ->
-                    albumSelection.selectedIds.forEach { id ->
-                        uiState.allMedia.firstOrNull { it.id == id }?.let { viewModel.copyMedia(it, dest) }
-                    }
+                    viewModel.organizeMedia(uiState.allMedia.filter { it.id in albumSelection.selectedIds }, dest, copy = true)
                     albumSelection = SelectionState()
                     showAlbumBulkMoveSheet = false
                 },
@@ -253,16 +265,12 @@ fun MainScreen(viewModel: GalleryViewModel) {
                 albums    = uiState.destinationAlbums,
                 onDismiss = { showBulkMoveSheet = false },
                 onMove    = { dest ->
-                    selection.selectedIds.forEach { id ->
-                        uiState.allMedia.firstOrNull { it.id == id }?.let { viewModel.moveMedia(it, dest) }
-                    }
+                    viewModel.organizeMedia(uiState.allMedia.filter { it.id in selection.selectedIds }, dest, copy = false)
                     selection = SelectionState()
                     showBulkMoveSheet = false
                 },
                 onCopy    = { dest ->
-                    selection.selectedIds.forEach { id ->
-                        uiState.allMedia.firstOrNull { it.id == id }?.let { viewModel.copyMedia(it, dest) }
-                    }
+                    viewModel.organizeMedia(uiState.allMedia.filter { it.id in selection.selectedIds }, dest, copy = true)
                     selection = SelectionState()
                     showBulkMoveSheet = false
                 },
@@ -290,10 +298,13 @@ fun MainScreen(viewModel: GalleryViewModel) {
         ImageEditorScreen(
             item   = item,
             onBack = { editingItemId = null },
-            onSave = { bitmap ->
+            onSave = { bitmap, completed ->
                 viewModel.saveEditedImage(item, bitmap) { uri ->
-                    editingItemId = null
-                    saveResult = if (uri != null) "Saved to Pictures/myMedia" else "Save failed"
+                    completed(uri != null)
+                    if (uri != null) {
+                        editingItemId = null
+                        saveResult = "Saved to Pictures/myMedia"
+                    }
                 }
             }
         )

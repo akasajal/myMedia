@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -146,7 +147,7 @@ val photoFilters: List<PhotoFilter> = listOf(
 fun ImageEditorScreen(
     item: MediaItem,
     onBack: () -> Unit,
-    onSave: (Bitmap) -> Unit,
+    onSave: (Bitmap, (Boolean) -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -171,19 +172,26 @@ fun ImageEditorScreen(
 
     // Load source bitmap once for save
     var sourceBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(item.uri) {
-        withContext(Dispatchers.IO) {
-            try {
+    var loadAttempt by remember { mutableIntStateOf(0) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var saveError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(item.uri, loadAttempt) {
+        sourceBitmap = null
+        loadError = null
+        try {
+            sourceBitmap = withContext(Dispatchers.IO) {
                 val req = ImageRequest.Builder(context).data(item.uri).allowHardware(false).build()
                 val result = coil.ImageLoader(context).execute(req)
-                if (result is SuccessResult) {
-                    sourceBitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                }
-            } catch (_: Exception) {}
+                (result as? SuccessResult)?.drawable?.let { (it as? android.graphics.drawable.BitmapDrawable)?.bitmap }
+                    ?: error("Could not load this image. Check access and try again.")
+            }
+        } catch (e: Exception) {
+            loadError = e.message ?: "Could not load image"
         }
     }
 
     val previewBitmap by produceState<Bitmap?>(null, sourceBitmap, rotationDegrees) {
+        value = null
         value = withContext(Dispatchers.Default) { sourceBitmap?.let { rotateBitmap(it, rotationDegrees) } }
     }
 
@@ -202,17 +210,25 @@ fun ImageEditorScreen(
                             if (isSaving) return@TextButton
                             scope.launch {
                                 isSaving = true
+                                saveError = null
+                                try {
                                 val src = sourceBitmap
                                 if (src != null) {
                                     val result = withContext(Dispatchers.Default) {
                                         applyEdits(src, rotationDegrees, cropRect, selectedFilter)
                                     }
-                                    onSave(result)
+                                    onSave(result) { success ->
+                                        isSaving = false
+                                        if (!success) saveError = "Could not save image. Check storage access and try again."
+                                    }
                                 }
-                                isSaving = false
+                                } catch (e: Exception) {
+                                    isSaving = false
+                                    saveError = e.message ?: "Could not save image. Try again."
+                                }
                             }
                         },
-                        enabled = !isSaving,
+                        enabled = !isSaving && sourceBitmap != null && previewBitmap != null,
                     ) {
                         if (isSaving) {
                             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -237,7 +253,14 @@ fun ImageEditorScreen(
                     .weight(1f),
                 contentAlignment = Alignment.Center,
             ) {
-                if (activeTool == EditorTool.CROP) {
+                if (sourceBitmap == null) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (loadError == null) CircularProgressIndicator() else {
+                            Text(loadError.orEmpty(), color = Color.White, modifier = Modifier.padding(16.dp))
+                            Button(onClick = { loadAttempt++ }) { Text("Retry") }
+                        }
+                    }
+                } else if (activeTool == EditorTool.CROP) {
                     CroppablePreview(
                         item = item,
                         bitmap = previewBitmap,
@@ -256,6 +279,8 @@ fun ImageEditorScreen(
                     ) }
                 }
             }
+
+            saveError?.let { Text(it, color = Color.White, modifier = Modifier.padding(16.dp).semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }) }
 
             // ── Tool tab row ──────────────────────────────────────────────
             Row(

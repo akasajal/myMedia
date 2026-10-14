@@ -766,6 +766,7 @@ class MediaRepository(private val context: Context) {
     }
 
     fun permanentlyDelete(item: DeletedItem) {
+        check(context.contentResolver.delete(item.uri, null, null) > 0) { "Could not delete media" }
         val raw = prefs.getStringSet("recycle_bin", emptySet())!!.toMutableSet()
         raw.removeAll { deserializeDeleted(it)?.id == item.id }
         prefs.edit().putStringSet("recycle_bin", raw).apply()
@@ -777,6 +778,5 @@ class MediaRepository(private val context: Context) {
             saveSafCache(currentSaf)
         }
 
-        try { context.contentResolver.delete(item.uri, null, null) } catch (_: Exception) {}
     }
 }
