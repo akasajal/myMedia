@@ -108,10 +108,10 @@ private fun AlbumDestinationRow(
         
         Row {
             IconButton(onClick = onCopy) {
-                Icon(Icons.Rounded.ContentCopy, "Copy to this album")
+                Icon(Icons.Rounded.ContentCopy, "Copy to ${album.id}")
             }
             IconButton(onClick = onMove) {
-                Icon(Icons.Rounded.MoveToInbox, "Move to this album")
+                Icon(Icons.Rounded.MoveToInbox, "Move to ${album.id}")
             }
         }
     }

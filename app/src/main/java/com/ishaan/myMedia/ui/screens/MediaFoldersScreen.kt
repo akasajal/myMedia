@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import com.ishaan.myMedia.data.model.FolderNode
 import com.ishaan.myMedia.ui.theme.AccentForeground
@@ -127,7 +128,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.folderTreeItems(
                 }) {
                     Icon(
                         imageVector = if (isExpanded) Icons.Rounded.KeyboardArrowDown else Icons.Rounded.KeyboardArrowRight,
-                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        contentDescription = if (isExpanded) "Collapse ${node.name}" else "Expand ${node.name}",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -136,10 +137,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.folderTreeItems(
                 Spacer(Modifier.size(48.dp))
             }
 
-            IconButton(onClick = { onToggleVisibility(node.path) }) {
+            IconButton(onClick = { onToggleVisibility(node.path) }, modifier = Modifier.semantics { stateDescription = if (node.isVisible) "Visible" else "Hidden" }) {
                 Icon(
                     imageVector = if (node.isVisible) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                    contentDescription = "Toggle Visibility",
+                    contentDescription = if (node.isVisible) "Hide ${node.name}" else "Show ${node.name}",
                     tint = if (node.isVisible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
@@ -171,7 +172,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.folderTreeItems(
 
             if (isRoot) {
                 IconButton(onClick = { onRemoveRoot(node.path) }) {
-                    Icon(Icons.Rounded.RemoveCircleOutline, "Remove Root", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Rounded.RemoveCircleOutline, "Remove ${node.name} from selected folders", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }

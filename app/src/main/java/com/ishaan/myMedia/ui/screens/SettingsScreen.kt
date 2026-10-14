@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -273,7 +274,7 @@ private fun PrivacySettings(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { if (prefs.pinEnabled) showDisableConfirm = true else showPinSetup = true }
+                        .toggleable(value = prefs.pinEnabled, role = Role.Switch, onValueChange = { if (prefs.pinEnabled) showDisableConfirm = true else showPinSetup = true })
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -289,7 +290,7 @@ private fun PrivacySettings(
                 }
                 Switch(
                     checked         = prefs.pinEnabled,
-                    onCheckedChange = { if (it) showPinSetup = true else showDisableConfirm = true },
+                    onCheckedChange = null,
                 )
             }
 
@@ -299,7 +300,7 @@ private fun PrivacySettings(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSetBiometrics(!prefs.biometricsEnabled) }
+                            .toggleable(value = prefs.biometricsEnabled, role = Role.Switch, onValueChange = onSetBiometrics)
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -315,7 +316,7 @@ private fun PrivacySettings(
                         }
                         Switch(
                             checked         = prefs.biometricsEnabled,
-                            onCheckedChange = { onSetBiometrics(it) },
+                            onCheckedChange = null,
                         )
                     }
 
@@ -323,7 +324,7 @@ private fun PrivacySettings(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSetInstantLock(!prefs.instantLockEnabled) }
+                            .toggleable(value = prefs.instantLockEnabled, role = Role.Switch, onValueChange = onSetInstantLock)
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -339,7 +340,7 @@ private fun PrivacySettings(
                         }
                         Switch(
                             checked         = prefs.instantLockEnabled,
-                            onCheckedChange = { onSetInstantLock(it) },
+                            onCheckedChange = null,
                         )
                     }
                 }

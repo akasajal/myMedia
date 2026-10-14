@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -337,7 +338,10 @@ fun VideoPlayerScreen(
                         activeTrackColor   = PrimaryAccent,
                         inactiveTrackColor = Color.White.copy(alpha = 0.3f),
                     ),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().semantics {
+                        contentDescription = "Playback position"
+                        stateDescription = "${formatMs(if (isSeeking) seekMs else currentMs)} of ${formatMs(durationMs)}"
+                    },
                 )
 
                 Spacer(Modifier.height(4.dp))
@@ -363,7 +367,11 @@ fun VideoPlayerScreen(
                     }
 
                     // Repeat mode: OFF → ONE → ALL → OFF
-                    IconButton(onClick = {
+                    IconButton(modifier = Modifier.semantics { stateDescription = when (repeatMode) {
+                        Player.REPEAT_MODE_OFF -> "Repeat off"
+                        Player.REPEAT_MODE_ONE -> "Repeat this video"
+                        else -> "Repeat all videos"
+                    } }, onClick = {
                         repeatMode = when (repeatMode) {
                             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
                             Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
