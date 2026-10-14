@@ -1,6 +1,38 @@
 # UI, UX, and accessibility audit
 
-Reviewed source at commit `e863a8c`. This is a source review, not a device or TalkBack certification. No application behavior was changed during this audit.
+The original findings below reviewed source at `e863a8c` and are retained as historical context. Their line references describe that revision. The requested fixes have now been implemented; see the resolution table. The original audit was a source review, not a device or TalkBack certification.
+
+## Resolution status
+
+P1 fixes were compiled and committed individually before starting P2. Each P2 fix was also compiled before its own commit. The viewer's gesture-only control reveal was explicitly retained at the user's request.
+
+| Finding | Resolution commit |
+| --- | --- |
+| 1 — Wrong item after sorting | `ab66bb1` |
+| 2 — Missing move/copy destinations | `21224b4` |
+| 3 — Seeking before duration is known | `7aa21bc` |
+| 4 — Gesture-only viewer control reveal | Intentionally unchanged |
+| 5 — Accessible crop controls | `422c67f` |
+| 6 — Permission recovery | `f6f48b4` |
+| 13 — Hidden media in Favorites | `446b53c` |
+| 7 — Viewer collection during updates | `7042378`, refined in `dd128bc` |
+| 8 — Text/control contrast | `e01d703` |
+| 9 — Crop geometry | `4ec67ec` |
+| 10 — Album creation and Recent sorting | `030862e` |
+| 11 — PIN feedback | `9604643` |
+| 12 — Navigation/edit restoration | `b82359b`, refined in `dd128bc` |
+| 14 — Loading/file-operation recovery | `9a4c241`, refined in `36617b9` |
+| 15 — Save feedback and action counts | `a84d185` |
+| 16 — Thumbnail/selection semantics | `1fb9ad7` |
+| 17 — Contextual control labels | `ffb003b` |
+| 18 — Accessible control timing | `60f736b`; save messages use Material SnackbarHost |
+| 19 — Navigation-bar appearance | `7fc11bd` |
+
+Follow-up `8ba18f1` restricts the Albums overview to folders containing visible images or videos. Empty folders remain valid move/copy destinations; creating an empty folder explains that it will appear in Albums after media is added.
+
+Six local regression tests for seek bounds and fitted/rotated crop geometry were added in `88b4be9`; all pass. The final Kotlin compile and unit-test run passed without assembling an APK.
+
+The user reports device checks verified for TalkBack/Switch Access, large text/landscape, Settings previews, Appearance, Recycle Bin, Privacy and regression behavior. Video and keyboard/RTL device verification remain pending. Those reports do not substitute for new device testing of the changes in this fix series.
 
 P1 means a broken or inaccessible core flow. P2 means a significant usability or accessibility defect.
 
