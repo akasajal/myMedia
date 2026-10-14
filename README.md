@@ -1,154 +1,115 @@
 # myMedia
 
-A native Android gallery app built with Jetpack Compose and Material 3.
+A native Android gallery built with Kotlin, Jetpack Compose, and Material 3. Browse photos and videos from selected device folders, organize media, and keep gallery preferences on your device.
 
----
+See [CHANGELOG.md](CHANGELOG.md) for the changes prepared for **v1.1**.
 
-## Tech Stack
+## Features
+
+- **Media:** photos, videos, and GIF entries in a date-grouped grid. Sort by newest, oldest, name, or size; pinch to change the grid between two and six columns.
+- **Albums:** folders containing visible photos or videos, with covers, item counts, pinning, and name/count/recent-date sorting. Create a folder inside a selected destination; it appears in Albums once media is added.
+- **Favorites:** locally saved favorites, filtered by folder visibility.
+- **Viewer:** swipe between media, pinch or double-tap to zoom, pan within image bounds, and tap to show actions. Includes a thumbnail strip, sharing, editing, favorites, move/copy, deletion, and file information.
+- **Video:** Media3 playback with play/pause, seeking, ten-second skips, speed, mute, and repeat controls.
+- **Editor:** filters, 90-degree rotation, crop handles, and labeled crop-edge sliders. Edits are saved as a new JPEG in `Pictures/myMedia`, preserving the original.
+- **Folder management:** choose folders through Android's Storage Access Framework (SAF), browse their tree, and toggle visibility. Empty folders can still be move/copy destinations.
+- **Recently deleted:** restore entries or permanently delete them. Deleting initially hides the item in the app's recycle bin; physical deletion happens on permanent deletion or an expiry cleanup attempt when the bin is loaded.
+- **Appearance:** System / Dark / Light controls and six accent colors: Rose, Purple, Green, Teal, Gold, and Slate. Preferences persist across restarts.
+- **Privacy:** four-digit PIN, optional strong biometrics, Instant Lock, and protected recent-app previews when PIN lock is enabled.
+
+## Media access
+
+Add root folders through **Settings > Manage Media Folders**. The gallery combines MediaStore entries under those roots with cached SAF scans and refreshes folder contents in the background. Entries from both sources are deduplicated by file identity.
+
+On supported Android versions, library access can be granted for photos, videos, or selected media. If permission is denied, open Android's permission settings or continue with individual folder access. The app rechecks access and reloads media when returning to the foreground.
+
+The Albums overview excludes folders containing only text, audio, or no visible media. Hiding a folder excludes its contents from Media, Albums, Favorites, and storage totals. Visibility is an app display preference; it does not encrypt or relocate the files.
+
+## Privacy and accessibility
+
+PINs are stored as SHA-256 hashes in local SharedPreferences. When enabled, Instant Lock locks the gallery as the activity stops. PIN entry provides digit-count semantics, a labeled backspace action, and an incorrect-PIN message.
+
+With PIN lock enabled, Android 13+ disables recent-app snapshots. Earlier versions use a secure-window flag, which also blocks foreground screenshots. Android controls the replacement preview; it may be blank rather than blurred.
+
+Crop sliders provide an alternative to dragging. Thumbnail, selection, pinning, folder, settings, and playback controls expose descriptive labels or state. Video controls respect accessibility timing and remain visible while accessibility services are active. Light surfaces use contrasting text colors while pastel highlights remain available.
+
+The viewer's tap-to-reveal controls are intentionally retained. Video and keyboard/RTL device checks remain pending; implementation and validation details are recorded in [UI_UX_ACCESSIBILITY_AUDIT.md](UI_UX_ACCESSIBILITY_AUDIT.md).
+
+## Tech stack
 
 | Layer | Technology |
-|---|---|
+| --- | --- |
 | Language | Kotlin |
 | UI | Jetpack Compose + Material 3 |
-| Architecture | MVVM (ViewModel + StateFlow) |
-| Image Loading | Coil (with `VideoFrameDecoder` for thumbnails) |
-| Video Playback | Media3 ExoPlayer |
-| Storage Access | MediaStore API + Storage Access Framework (SAF) |
-| Biometrics | AndroidX Biometric (`BiometricPrompt`) |
-| Persistence | SharedPreferences |
-| Database | None — media is sourced live from MediaStore and SAF cache |
-| Min SDK | API 26 (Android 8.0) |
-| Target SDK | API 35 |
+| Architecture | MVVM, AndroidViewModel, StateFlow, coroutines |
+| Images and thumbnails | Coil + VideoFrameDecoder |
+| Video | AndroidX Media3 ExoPlayer |
+| Media access | MediaStore, SAF, DocumentFile, DocumentsContract |
+| Authentication | AndroidX BiometricPrompt |
+| Persistence | Local SharedPreferences; no database |
+| Android support | Minimum API 26; compile/target API 35 |
+| JVM | Gradle daemon JDK 21; app bytecode targets JVM 17 |
 
----
+The app requests no internet permission and has no cloud sync, analytics, or external API keys. Gradle needs access to repositories when build dependencies are not already cached.
 
-## Project Structure
+## Project structure
 
-```
+```text
 app/src/main/java/com/ishaan/myMedia/
-├── data/
-│   ├── model/
-│   │   └── Models.kt               # Data classes and enums (MediaItem, Album, FolderNode, etc.)
-│   └── repository/
-│       ├── MediaRepository.kt      # MediaStore queries, SAF handling, folder visibility, cache
-│       └── PrivacyRepository.kt    # PIN hashing, biometric prefs, lock state
-├── ui/
-│   ├── components/
-│   │   ├── LockScreen.kt           # PIN entry + biometric unlock UI
-│   │   ├── MediaGridRow.kt         # Reusable grid row composable
-│   │   ├── MoveCopySheet.kt        # Bottom sheet for move/copy operations
-│   │   ├── PinSetupDialog.kt       # PIN creation and confirmation dialog
-│   │   └── SharedComponents.kt     # MediaThumbnail and other shared composables
-│   ├── screens/
-│   │   ├── MainScreen.kt           # Root scaffold, bottom nav, screen routing
-│   │   ├── MediaScreen.kt          # Main media grid (photos + videos)
-│   │   ├── AlbumsScreen.kt         # Album grid view
-│   │   ├── FavoritesScreen.kt      # Favorites grid
-│   │   ├── MediaViewerScreen.kt    # Full-screen image/gif viewer with actions
-│   │   ├── VideoPlayerScreen.kt    # Full-screen video player
-│   │   ├── ImageEditorScreen.kt    # Image editor (filters, crop, rotate)
-│   │   ├── MediaFoldersScreen.kt   # Folder tree management
-│   │   ├── RecycleBinScreen.kt     # Deleted items with restore/purge
-│   │   └── SettingsScreen.kt       # App settings
-│   └── theme/
-│       ├── Theme.kt                # Color scheme (light + dark), GalleryTheme
-│       └── Type.kt                 # Typography
-├── viewmodel/
-│   └── GalleryViewModel.kt         # Single ViewModel holding GalleryUiState
-├── GalleryApplication.kt           # Application class, Coil ImageLoader setup
-└── MainActivity.kt                 # Entry point, splash screen, permission gate, biometric prompt
-```
+|-- MainActivity.kt                 # Entry, permissions, lock lifecycle, Recents protection
+|-- GalleryApplication.kt           # Shared Coil image loader and caches
+|-- data/
+|   |-- model/Models.kt             # Media, album, folder, privacy, and appearance models
+|   `-- repository/
+|       |-- MediaRepository.kt      # Queries, scans, deduplication, folders, file operations
+|       `-- PrivacyRepository.kt    # PIN hash and privacy preferences
+|-- viewmodel/GalleryViewModel.kt   # Gallery state, loading, operations, and feedback
+`-- ui/
+    |-- screens/                   # Tabs, album details, viewer, player, editor, folders, bin
+    |   |-- MainScreen.kt          # Routing, saved navigation state, snackbar host
+    |   |-- SelectionState.kt      # Media selection model
+    |   `-- MediaUiMath.kt         # Seek bounds and fitted image geometry
+    |-- components/                # Thumbnails, grids, PIN keypad/dialogs, move/copy sheet
+    `-- theme/                     # Material colors, system bars, typography
 
----
+app/src/test/java/com/ishaan/myMedia/ui/screens/
+`-- MediaUiMathTest.kt              # Local seeking and crop-geometry regression tests
+
+gradle/libs.versions.toml           # Dependency and plugin versions
+CHANGELOG.md                       # Version release notes
+UI_UX_ACCESSIBILITY_AUDIT.md        # Audit findings, resolution commits, validation status
+```
 
 ## Architecture
 
-The app uses a single-ViewModel MVVM pattern. `GalleryViewModel` exposes one `GalleryUiState` data class via `StateFlow`, and all screens read from it via `collectAsStateWithLifecycle()`.
+`GalleryViewModel` coordinates `MediaRepository` and `PrivacyRepository`. `MainScreen` collects its `GalleryUiState` with lifecycle awareness and passes data and callbacks to the screens.
 
-```
-MediaRepository  ──►  GalleryViewModel  ──►  GalleryUiState (StateFlow)
-PrivacyRepository ──►        │                      │
-                             │               Compose screens
-                             │               (collect + render)
-                        viewModelScope
-                        (coroutines)
+```text
+MediaRepository ----\
+                     > GalleryViewModel -> GalleryUiState -> Compose screens
+PrivacyRepository --/
 ```
 
-### State
+State includes unfiltered and visible media, date groups, albums, destination folders, favorites, recycle-bin entries, folder visibility, appearance, privacy, and operation feedback. Saved navigation uses route IDs rather than serializing the full library. Viewer updates preserve their source collection and current item; editor state survives activity recreation.
 
-`GalleryUiState` holds:
-- `rawMedia` — all media items, unfiltered by visibility (used for re-applying visibility in-memory)
-- `allMedia` — visibility-filtered media for display
-- `allFolderPaths` — set of all folder paths that contain media, regardless of visibility (used to keep hidden folders in the tree)
-- `folderTree` — hierarchical `FolderNode` tree for the Manage Folders screen
-- `mediaGroups` — media grouped by date for the grid header
-- `albums`, `favorites`, `deletedItems`, `chosenFolders`
-- `theme`, `gridColumns`, `sortOrder`, `privacyPrefs`, `isLocked`
+## Build and checks
 
----
+Use the included Gradle wrapper with an Android SDK installation containing API 35 and a JDK 21 runtime for the Gradle daemon. Configure the SDK path through Android Studio or `local.properties`.
 
-## Media Sources
+PowerShell:
 
-The app reads media from two sources:
+```powershell
+# Compile Kotlin without assembling an APK
+.\gradlew.bat :app:compileDebugKotlin
 
-**MediaStore** — standard gallery folders (`DCIM`, `Pictures`, `Movies`, etc.) queried via `ContentResolver`.
+# Run local regression tests
+.\gradlew.bat :app:testDebugUnitTest --no-configuration-cache
 
-**SAF (Storage Access Framework)** — user-picked folders outside standard paths. URIs are persisted with `takePersistableUriPermission` so they survive app restarts. SAF media is cached in SharedPreferences and refreshed in the background after each load.
-
----
-
-## Folder Visibility
-
-Each folder path has a `folder_visible_<path>` boolean in SharedPreferences (default `true`). Hiding a parent folder implicitly hides all its subfolders via `isFolderVisible()`, which walks up the path tree. Toggling visibility is instant — it rebuilds the folder tree and refilters `rawMedia` in-memory without any disk access.
-
----
-
-## Privacy & Security
-
-- PIN is SHA-256 hashed before storage in SharedPreferences
-- Biometric authentication uses `BiometricPrompt` with `BIOMETRIC_STRONG`
-- Instant lock re-locks the app on every `onStop()`
-- The lock screen intercepts navigation before any media is shown
-
----
-
-## Theming
-
-The app uses a custom purple palette (`RichPlum`, `DeepGrape`, `MediumViolet`, `LavenderMist`) applied via Material 3 `lightColorScheme` / `darkColorScheme`. Theme follows system by default and can be overridden to Light or Dark in Settings. Status bar is transparent with edge-to-edge enabled.
-
----
-
-## Dependencies
-
-```kotlin
-// Core
-androidx.core.splashscreen:1.0.1
-androidx.biometric:biometric:1.2.0-alpha05
-androidx.documentfile:documentfile:1.1.0
-
-// Compose
-androidx.compose (BOM)
-androidx.compose.material3
-androidx.compose.material.icons.extended
-androidx.lifecycle.viewmodel.compose
-androidx.lifecycle.runtime.compose
-androidx.activity.compose
-androidx.compose.foundation (HorizontalPager)
-
-// Media
-coil:coil-compose
-coil:coil-video
-androidx.media3:media3-exoplayer:1.3.1
-androidx.media3:media3-ui:1.3.1
+# Build APKs when needed
+.\gradlew.bat :app:assembleDebug
+.\gradlew.bat :app:assembleRelease
 ```
 
----
+On macOS/Linux, use `./gradlew` instead of `.\gradlew.bat`. Add `--offline` only after dependencies are cached.
 
-## Build
-
-```bash
-./gradlew assembleDebug
-./gradlew assembleRelease
-```
-
-Requires Android Studio Hedgehog or later. No API keys or external services needed.
+The six local regression tests cover unknown video duration, seek limits/overflow, landscape letterboxing, rotated image dimensions, and an unmeasured preview. Kotlin compilation and these tests passed for the v1.1 changes. Android lint encountered an internal detector-loading failure; see the audit for details.
