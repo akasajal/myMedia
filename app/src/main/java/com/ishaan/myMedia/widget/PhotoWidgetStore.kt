@@ -17,6 +17,15 @@ data class PhotoWidgetConfig(
 internal fun widgetFolderMatches(album: String, folders: Set<String>): Boolean =
     folders.any { album == it || album.startsWith("${it.trimEnd('/')}/") }
 
+internal fun widgetFolderVisible(album: String, isVisible: (String) -> Boolean): Boolean {
+    var path = album.trimEnd('/')
+    while (path.isNotEmpty()) {
+        if (!isVisible(path)) return false
+        path = path.substringBeforeLast('/', "")
+    }
+    return true
+}
+
 internal val widgetIntervals = listOf(15, 30, 60, 300)
 
 /** Keep each RemoteViews bitmap below 720 KB, regardless of source or widget size. */

@@ -25,9 +25,11 @@ import kotlinx.coroutines.runBlocking
 internal suspend fun widgetImages(context: Context, config: PhotoWidgetConfig): List<MediaItem> {
     if (PrivacyRepository(context).getPrivacyPrefs().pinEnabled) return emptyList()
     val repo = MediaRepository(context)
+    val visibility = mutableMapOf<String, Boolean>()
     return repo.loadVisibleMedia().filter { item ->
-        item.mediaType != MediaType.VIDEO && if (config.imageUri != null)
-            item.uri.toString() == config.imageUri else widgetFolderMatches(item.albumId, config.folders)
+        item.mediaType != MediaType.VIDEO &&
+            visibility.getOrPut(item.albumId) { widgetFolderVisible(item.albumId, repo::isFolderVisible) } &&
+            (if (config.imageUri != null) item.uri.toString() == config.imageUri else widgetFolderMatches(item.albumId, config.folders))
     }.distinctBy { it.uri }.let { if (config.shuffle) it.shuffled() else it }
 }
 
@@ -55,7 +57,8 @@ private class PhotoFactory(private val context: Context, private val id: Int) : 
         val views = RemoteViews(context.packageName, if (config.fit) R.layout.photo_widget_item_fit else R.layout.photo_widget_item)
         val item = items.getOrNull(position) ?: return views
         // Recheck on every request, even when the launcher retained this factory.
-        if (PrivacyRepository(context).getPrivacyPrefs().pinEnabled || !MediaRepository(context).isFolderVisible(item.albumId)) return views
+        if (PrivacyRepository(context).getPrivacyPrefs().pinEnabled ||
+            !widgetFolderVisible(item.albumId, MediaRepository(context)::isFolderVisible)) return views
         val bitmap = runBlocking(Dispatchers.IO) {
             try {
                 val (width, height) = bitmapSize

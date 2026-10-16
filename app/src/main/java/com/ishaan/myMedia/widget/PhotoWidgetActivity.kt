@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,6 +42,7 @@ import com.ishaan.myMedia.R
 import com.ishaan.myMedia.data.model.AppTheme
 import com.ishaan.myMedia.data.model.MediaItem
 import com.ishaan.myMedia.data.model.MediaType
+import com.ishaan.myMedia.data.repository.MediaRepository
 import com.ishaan.myMedia.ui.components.LockScreen
 import com.ishaan.myMedia.ui.screens.ZoomableImage
 import com.ishaan.myMedia.ui.theme.GalleryTheme
@@ -80,7 +82,8 @@ class PhotoWidgetActivity : FragmentActivity() {
                     val requested = intent.getStringExtra(EXTRA_URI)
                     val item = state.allMedia.firstOrNull {
                         it.uri.toString() == requested && it.mediaType != MediaType.VIDEO &&
-                            if (saved.imageUri != null) requested == saved.imageUri else widgetFolderMatches(it.albumId, saved.folders)
+                            widgetFolderVisible(it.albumId, MediaRepository(this)::isFolderVisible) &&
+                            (if (saved.imageUri != null) requested == saved.imageUri else widgetFolderMatches(it.albumId, saved.folders))
                     }
                     PhotoFromWidget(item, state.isLoading, onBack = ::finish)
                 } else {
@@ -148,8 +151,14 @@ private fun WidgetConfiguration(
     var interval by rememberSaveable { mutableIntStateOf(saved?.intervalSeconds ?: 15) }
     var shuffle by rememberSaveable { mutableStateOf(saved?.shuffle ?: false) }
     var fit by rememberSaveable { mutableStateOf(saved?.fit ?: false) }
+    val context = LocalContext.current
+    val repo = remember(context) { MediaRepository(context) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri -> if (uri != null) onAddFolder(uri) }
-    val images = remember(state.allMedia) { state.allMedia.filter { it.mediaType != MediaType.VIDEO } }
+    val images = remember(state.allMedia, state.folderTree) {
+        val visibility = mutableMapOf<String, Boolean>()
+        state.allMedia.filter { it.mediaType != MediaType.VIDEO &&
+            visibility.getOrPut(it.albumId) { widgetFolderVisible(it.albumId, repo::isFolderVisible) } }
+    }
     val availableFolders = remember(images, state.chosenFolders) {
         (images.map { it.albumId } + state.chosenFolders.filterValues { it }.keys)
             .distinct().filter { folder -> images.any { widgetFolderMatches(it.albumId, setOf(folder)) } }.sorted()

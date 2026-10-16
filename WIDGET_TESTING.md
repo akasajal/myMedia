@@ -4,7 +4,7 @@
 
 `./gradlew :app:compileDebugKotlin :app:testDebugUnitTest --offline --no-configuration-cache`
 
-Kotlin/resource compilation and all 10 unit tests passed during implementation. Four widget tests cover descendant folder matching, path boundaries, overlapping selections, bitmap aspect ratios, and the 720 KB per-image memory ceiling. The remaining six are existing seek/crop regression tests.
+Kotlin/resource compilation and all 11 unit tests passed during implementation. Five widget tests cover descendant folder matching, hidden ancestors, path boundaries, overlapping selections, bitmap aspect ratios, and the 720 KB per-image memory ceiling. The remaining six are existing seek/crop regression tests.
 
 No APK was assembled or installed as part of these checks. The following launcher checks remain unverified.
 

@@ -4,6 +4,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PhotoWidgetTest {
+    @Test fun hiddenAncestorsExcludeDescendantsWithoutHidingSimilarNames() {
+        val hidden = setOf("/Photos/Private")
+        assertFalse(widgetFolderVisible("/Photos/Private") { it !in hidden })
+        assertFalse(widgetFolderVisible("/Photos/Private/Trip/Day 1") { it !in hidden })
+        assertTrue(widgetFolderVisible("/Photos/PrivateOther/Trip") { it !in hidden })
+        assertTrue(widgetFolderVisible("/Photos/Public") { it !in hidden })
+    }
     @Test fun folderSelectionIncludesDescendantsButNotSimilarNames() {
         val folders = setOf("/storage/emulated/0/Pictures/Trip")
         assertTrue(widgetFolderMatches("/storage/emulated/0/Pictures/Trip", folders))

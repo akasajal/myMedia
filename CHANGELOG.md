@@ -15,7 +15,7 @@ Entries describe application behavior; the audit records the individual accessib
 
 ### Validation
 
-- Kotlin/resource compilation and all 10 local unit tests passed. Launcher rendering, rotation, screen-off behavior, resizing, and accessibility require device verification; see `WIDGET_TESTING.md`.
+- Kotlin/resource compilation and all 11 local unit tests passed. Launcher rendering, rotation, screen-off behavior, resizing, and accessibility require device verification; see `WIDGET_TESTING.md`.
 
 ## 1.1
 
