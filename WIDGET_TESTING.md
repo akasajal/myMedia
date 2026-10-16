@@ -4,7 +4,7 @@
 
 `./gradlew :app:compileDebugKotlin :app:testDebugUnitTest --offline --no-configuration-cache`
 
-Kotlin/resource compilation and all 11 unit tests passed during implementation. Five widget tests cover descendant folder matching, hidden ancestors, path boundaries, overlapping selections, bitmap aspect ratios, and the 720 KB per-image memory ceiling. The remaining six are existing seek/crop regression tests.
+Kotlin/resource compilation and all 12 unit tests passed during implementation. Six widget tests cover per-widget app-lock permission, descendant folder matching, hidden ancestors, path boundaries, overlapping selections, bitmap aspect ratios, and the 720 KB per-image memory ceiling. The remaining six are existing seek/crop regression tests.
 
 No APK was assembled or installed as part of these checks. The following launcher checks remain unverified.
 
@@ -18,7 +18,9 @@ No APK was assembled or installed as part of these checks. The following launche
 - Switch launcher pages and open another app; check visibility-dependent pausing and return behavior on the device's launcher.
 - Add two widgets with different sources and intervals; verify next, configure, and photo-opening actions affect the correct widget.
 - Resize horizontally and vertically; verify cropping, fit framing, controls, and image clarity. Also check landscape and launcher recreation.
-- Enable PIN lock with photos already displayed. Verify both widgets immediately replace photos with placeholders. Test PIN and biometric access to configuration; unlocking settings must not expose photos on the home screen.
+- Add widgets with app lock both enabled and disabled. Verify each setup asks Allow/Deny before saving; dismissing the dialog must not save a new widget. Rotate the device while the warning is open and confirm the pending choice survives.
+- Allow one widget and deny another, then enable PIN lock with photos already displayed. Verify the allowed widget continues displaying/rotating and its next control works, while the denied widget becomes a placeholder. Revoke and grant permission in widget settings and verify immediate updates and persistence after restart. Existing pre-consent widget configurations must default to Deny.
+- Test PIN and biometric access when opening a photo or configuration from an allowed widget. Home-screen display permission must not bypass authentication or expose hidden-folder media.
 - Hide/remove a selected root, hide a child folder, recycle/restore an image, and revoke folder access. Verify old photos disappear and configuration remains reachable.
 - Delete a file outside the app, refresh the gallery, and verify missing/unreadable files show recovery feedback without crashing. For SAF-only sources, refresh the app's scan cache before expecting discoveries in the widget.
 - Test reboot, process termination, widget deletion/re-addition, reconfiguration, and launcher backup/restore ID remapping.

@@ -151,6 +151,10 @@ private fun WidgetConfiguration(
     var interval by rememberSaveable { mutableIntStateOf(saved?.intervalSeconds ?: 15) }
     var shuffle by rememberSaveable { mutableStateOf(saved?.shuffle ?: false) }
     var fit by rememberSaveable { mutableStateOf(saved?.fit ?: false) }
+    // Ask for every new widget, even if app lock is currently disabled.
+    var allowWhileLocked by rememberSaveable { mutableStateOf<Boolean?>(saved?.allowWhileLocked) }
+    var showPrivacyWarning by rememberSaveable { mutableStateOf(false) }
+    var saveAfterPrivacyChoice by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val repo = remember(context) { MediaRepository(context) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri -> if (uri != null) onAddFolder(uri) }
@@ -168,6 +172,31 @@ private fun WidgetConfiguration(
         images.filter { if (mode == 0) it.uri.toString() == image else widgetFolderMatches(it.albumId, validFolders) }
     }
     val canSave = !state.isLoading && candidates.isNotEmpty() && (mode != 1 || validFolders.size == 1)
+    fun saveConfiguration(allow: Boolean) {
+        onSave(PhotoWidgetConfig(
+            imageUri = if (mode == 0) image else null,
+            folders = if (mode == 0) emptySet() else validFolders,
+            intervalSeconds = interval,
+            shuffle = shuffle,
+            fit = fit,
+            allowWhileLocked = allow,
+        ))
+    }
+    fun choosePrivacy(allow: Boolean) {
+        allowWhileLocked = allow
+        showPrivacyWarning = false
+        if (saveAfterPrivacyChoice && canSave) saveConfiguration(allow)
+        saveAfterPrivacyChoice = false
+    }
+    if (showPrivacyWarning) {
+        AlertDialog(
+            onDismissRequest = { showPrivacyWarning = false; saveAfterPrivacyChoice = false },
+            title = { Text(stringResource(R.string.widget_privacy_warning_title)) },
+            text = { Text(stringResource(R.string.widget_privacy_warning)) },
+            confirmButton = { TextButton(onClick = { choosePrivacy(true) }) { Text(stringResource(R.string.widget_allow)) } },
+            dismissButton = { TextButton(onClick = { choosePrivacy(false) }) { Text(stringResource(R.string.widget_deny)) } },
+        )
+    }
     Scaffold(topBar = {
         TopAppBar(title = { Text(stringResource(R.string.widget_configure)) }, navigationIcon = {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.widget_back)) }
@@ -175,7 +204,11 @@ private fun WidgetConfiguration(
     }, bottomBar = {
         Surface(tonalElevation = 3.dp) {
             Button(
-                onClick = { onSave(PhotoWidgetConfig(if (mode == 0) image else null, if (mode == 0) emptySet() else validFolders, interval, shuffle, fit)) },
+                onClick = {
+                    val allowed = allowWhileLocked
+                    if (allowed == null) { saveAfterPrivacyChoice = true; showPrivacyWarning = true }
+                    else saveConfiguration(allowed)
+                },
                 enabled = canSave,
                 modifier = Modifier.navigationBarsPadding().padding(16.dp).fillMaxWidth(),
             ) { Text(stringResource(if (saved == null) R.string.widget_add else R.string.widget_save)) }
@@ -189,7 +222,14 @@ private fun WidgetConfiguration(
                     else Text(stringResource(R.string.widget_choose_source), modifier = Modifier.padding(16.dp))
                 }
             }
-            if (state.privacyPrefs.pinEnabled) item { Text(stringResource(R.string.widget_privacy_note), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item {
+                WidgetToggle(stringResource(R.string.widget_show_while_locked), allowWhileLocked == true) { allow ->
+                    if (allow) { saveAfterPrivacyChoice = false; showPrivacyWarning = true }
+                    else allowWhileLocked = false
+                }
+                Text(stringResource(R.string.widget_privacy_note), color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall)
+            }
             item { Text(stringResource(R.string.widget_source), style = MaterialTheme.typography.titleMedium) }
             items(listOf(R.string.widget_single_image, R.string.widget_one_folder, R.string.widget_multiple_folders)) { label ->
                 val index = when (label) { R.string.widget_single_image -> 0; R.string.widget_one_folder -> 1; else -> 2 }

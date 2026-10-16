@@ -23,7 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 
 internal suspend fun widgetImages(context: Context, config: PhotoWidgetConfig): List<MediaItem> {
-    if (PrivacyRepository(context).getPrivacyPrefs().pinEnabled) return emptyList()
+    if (!widgetPhotosAllowed(PrivacyRepository(context).getPrivacyPrefs().pinEnabled, config)) return emptyList()
     val repo = MediaRepository(context)
     val visibility = mutableMapOf<String, Boolean>()
     return repo.loadVisibleMedia().filter { item ->
@@ -57,7 +57,7 @@ private class PhotoFactory(private val context: Context, private val id: Int) : 
         val views = RemoteViews(context.packageName, if (config.fit) R.layout.photo_widget_item_fit else R.layout.photo_widget_item)
         val item = items.getOrNull(position) ?: return views
         // Recheck on every request, even when the launcher retained this factory.
-        if (PrivacyRepository(context).getPrivacyPrefs().pinEnabled ||
+        if (!widgetPhotosAllowed(PrivacyRepository(context).getPrivacyPrefs().pinEnabled, PhotoWidgetStore(context).read(id)) ||
             !widgetFolderVisible(item.albumId, MediaRepository(context)::isFolderVisible)) return views
         val bitmap = runBlocking(Dispatchers.IO) {
             try {

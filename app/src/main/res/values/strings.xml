@@ -8,7 +8,7 @@
     <string name="widget_description">A wide photo widget for an image or a slideshow from your folders.</string>
     <string name="widget_configure">Photo widget settings</string>
     <string name="widget_setup">Choose photos for your widget</string>
-    <string name="widget_locked">App lock is enabled. Open widget settings to unlock and configure.</string>
+    <string name="widget_locked">Photos are hidden by app lock. Open widget settings to allow them on this widget.</string>
     <string name="widget_no_images">No photos available. Open widget settings to choose another source.</string>
     <string name="widget_unreadable">Could not open this photo. Use Next or choose another source in widget settings.</string>
     <string name="widget_loading">Loading photo…</string>
@@ -31,7 +31,12 @@
     <string name="widget_5m">5 minutes</string>
     <string name="widget_shuffle">Shuffle photos</string>
     <string name="widget_timing_note">Photos rotate while the launcher displays the widget. Returning to it starts a fresh interval; screen-off time does not advance the slideshow.</string>
-    <string name="widget_privacy_note">While app lock is enabled, the home-screen widget hides all photos, even after you unlock this settings screen.</string>
+    <string name="widget_privacy_note">Choose whether this widget may display photos while My Media is locked. Opening photos or settings still requires unlocking the app.</string>
+    <string name="widget_show_while_locked">Show photos while app lock is enabled</string>
+    <string name="widget_privacy_warning_title">Show photos while the app is locked?</string>
+    <string name="widget_privacy_warning">Anyone who can see your home screen will be able to see photos from this widget’s selected sources, even while My Media is locked. Allow applies only to this widget. Opening a photo or widget settings still requires unlocking the app. Deny hides this widget’s photos whenever app lock is enabled.</string>
+    <string name="widget_allow">Allow</string>
+    <string name="widget_deny">Deny</string>
     <string name="widget_add_folder">Add a folder to My Media</string>
     <string name="widget_no_library">Add a folder containing photos to get started. Hidden folders and videos are excluded.</string>
     <string name="widget_add">Add widget</string>

@@ -11,7 +11,11 @@ data class PhotoWidgetConfig(
     val intervalSeconds: Int = 15,
     val shuffle: Boolean = false,
     val fit: Boolean = false,
+    val allowWhileLocked: Boolean = false,
 )
+
+internal fun widgetPhotosAllowed(lockEnabled: Boolean, config: PhotoWidgetConfig?): Boolean =
+    config != null && (!lockEnabled || config.allowWhileLocked)
 
 /** Folder selections include descendants, with path boundaries preserved. */
 internal fun widgetFolderMatches(album: String, folders: Set<String>): Boolean =
@@ -49,6 +53,7 @@ class PhotoWidgetStore(context: Context) {
                 intervalSeconds = json.optInt("interval", 15).takeIf { it in widgetIntervals } ?: 15,
                 shuffle = json.optBoolean("shuffle"),
                 fit = json.optBoolean("fit"),
+                allowWhileLocked = json.optBoolean("allowWhileLocked", false),
             )
         }
     } catch (_: Exception) { null }
@@ -60,6 +65,7 @@ class PhotoWidgetStore(context: Context) {
             put("interval", config.intervalSeconds)
             put("shuffle", config.shuffle)
             put("fit", config.fit)
+            put("allowWhileLocked", config.allowWhileLocked)
         }
         prefs.edit().putString(id.toString(), json.toString()).apply()
     }

@@ -4,6 +4,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PhotoWidgetTest {
+    @Test fun appLockRequiresExplicitPermissionForEachWidget() {
+        val denied = PhotoWidgetConfig()
+        val allowed = denied.copy(allowWhileLocked = true)
+        assertFalse(widgetPhotosAllowed(true, denied))
+        assertTrue(widgetPhotosAllowed(true, allowed))
+        assertTrue(widgetPhotosAllowed(false, denied))
+        assertTrue(widgetPhotosAllowed(false, allowed))
+        assertFalse(widgetPhotosAllowed(true, null))
+        assertFalse(widgetPhotosAllowed(false, null))
+        // Allowing one widget never changes another widget's default.
+        assertFalse(widgetPhotosAllowed(true, PhotoWidgetConfig()))
+    }
     @Test fun hiddenAncestorsExcludeDescendantsWithoutHidingSimilarNames() {
         val hidden = setOf("/Photos/Private")
         assertFalse(widgetFolderVisible("/Photos/Private") { it !in hidden })

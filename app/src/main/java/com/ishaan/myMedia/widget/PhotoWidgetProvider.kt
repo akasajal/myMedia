@@ -47,7 +47,7 @@ class PhotoWidgetProvider : AppWidgetProvider() {
             val id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             if (id !in AppWidgetManager.getInstance(context).getAppWidgetIds(ComponentName(context, PhotoWidgetProvider::class.java))) return
             val config = PhotoWidgetStore(context).read(id) ?: return
-            if (!PrivacyRepository(context).getPrivacyPrefs().pinEnabled) {
+            if (widgetPhotosAllowed(PrivacyRepository(context).getPrivacyPrefs().pinEnabled, config)) {
                 AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(id,
                     RemoteViews(context.packageName, layout(config)).apply { showNext(R.id.widget_slideshow) })
             }
@@ -71,7 +71,7 @@ class PhotoWidgetProvider : AppWidgetProvider() {
 
         fun update(context: Context, id: Int) {
             val config = PhotoWidgetStore(context).read(id)
-            val locked = PrivacyRepository(context).getPrivacyPrefs().pinEnabled
+            val locked = !widgetPhotosAllowed(PrivacyRepository(context).getPrivacyPrefs().pinEnabled, config) && config != null
             val views = RemoteViews(context.packageName, if (locked || config == null) R.layout.photo_widget_empty else layout(config))
             val configure = Intent(context, PhotoWidgetActivity::class.java)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)

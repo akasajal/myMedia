@@ -10,12 +10,12 @@ Entries describe application behavior; the audit records the individual accessib
 - Folder slideshow intervals of 15 seconds, 30 seconds, 1 minute, and 5 minutes, with shuffle, fit/fill framing, manual next, and independent configuration per widget.
 - Launcher-managed slideshow rotation without a persistent background service. Hidden-window time does not advance the slideshow; returning starts a fresh interval rather than resuming the partial countdown.
 - A zoomable photo view opened from the widget, protected by the app's PIN/biometric lock.
-- Widget privacy updates when folder visibility, selected roots, the scan cache, recycle-bin entries, or PIN-lock settings change. PIN lock replaces widget photos with a placeholder.
+- Widget privacy updates when folder visibility, selected roots, the scan cache, recycle-bin entries, or PIN-lock settings change. Setup asks Allow/Deny for displaying photos while app lock is enabled, with a separate saved choice per widget and a setting to change it. Existing widgets default to Deny. Opening photos or configuration still requires authentication.
 - Bounded widget bitmap rendering and regression tests for folder boundaries, overlapping selections, and image memory limits.
 
 ### Validation
 
-- Kotlin/resource compilation and all 11 local unit tests passed. Launcher rendering, rotation, screen-off behavior, resizing, and accessibility require device verification; see `WIDGET_TESTING.md`.
+- Kotlin/resource compilation and all 12 local unit tests passed. Launcher rendering, rotation, screen-off behavior, resizing, and accessibility require device verification; see `WIDGET_TESTING.md`.
 
 ## 1.1
 
