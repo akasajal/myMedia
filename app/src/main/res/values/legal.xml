@@ -2,7 +2,8 @@
 <resources>
     <string name="about_heading">ABOUT</string>
     <string name="about_app_version">myMedia - v%1$s</string>
-    <string name="about_developed_by">-developed by</string>
+    <string name="about_subtitle">Your moments, your gallery.</string>
+    <string name="about_developed_by">- developed by</string>
     <string name="about_developer_link">sajal on GitHub, opens in browser</string>
     <string name="terms_title">Terms of Use</string>
     <string name="privacy_policy_title">Privacy Policy</string>

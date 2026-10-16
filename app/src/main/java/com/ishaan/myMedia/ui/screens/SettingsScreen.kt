@@ -143,6 +143,9 @@ private fun AboutApp(onOpenLegalDocument: (LegalDocument) -> Unit) {
                 color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.about_app_version, version), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(stringResource(R.string.about_subtitle), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(verticalArrangement = Arrangement.Center) {
                 Text(stringResource(R.string.about_developed_by), modifier = Modifier.align(Alignment.CenterVertically),
                     style = MaterialTheme.typography.bodyLarge)
