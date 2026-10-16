@@ -2,7 +2,7 @@
 
 A native Android gallery built with Kotlin, Jetpack Compose, and Material 3. Browse photos and videos from selected device folders, organize media, and keep gallery preferences on your device.
 
-See [CHANGELOG.md](CHANGELOG.md) for the changes prepared for **v1.1**.
+See [CHANGELOG.md](CHANGELOG.md) for **v1.2** and earlier changes.
 
 ## Features
 
@@ -16,6 +16,19 @@ See [CHANGELOG.md](CHANGELOG.md) for the changes prepared for **v1.1**.
 - **Recently deleted:** restore entries or permanently delete them. Deleting initially hides the item in the app's recycle bin; physical deletion happens on permanent deletion or an expiry cleanup attempt when the bin is loaded.
 - **Appearance:** System / Dark / Light controls and six accent colors: Rose, Purple, Green, Teal, Gold, and Slate. Preferences persist across restarts.
 - **Privacy:** four-digit PIN, optional strong biometrics, Instant Lock, and protected recent-app previews when PIN lock is enabled.
+- **Photo widget:** a resizable wide home-screen widget showing one image or a slideshow from one or more folders, with fit/fill framing, shuffle, and separate settings for each widget.
+
+## Photo widget
+
+Open your launcher's widget picker, choose **My Media Photos**, and place the widget. Select a particular image, one folder, or multiple folders, then tap **Add widget**. You can also add a folder to the app from this configuration screen. The default size is 4 × 2 cells; actual sizing depends on the launcher.
+
+Folder slideshows include photos from descendants and combine overlapping selections without duplicate files. Choose a 15-second, 30-second, 1-minute, or 5-minute interval. Shuffle changes the order when the collection reloads. GIFs appear as still frames; videos are excluded. Tap a photo to open a zoomable view, use the next button to advance, or use the menu button to reconfigure.
+
+The launcher runs the slideshow through Android's native `AdapterViewFlipper`, without a persistent service or frequent alarms. It pauses when the widget's window is hidden, including screen-off on supported launchers. Returning starts a fresh interval; partial countdowns are not preserved. Launcher behavior must be verified on a device. The 30-minute widget update refreshes the collection, independently of the slide interval; SAF-only discoveries also depend on the app's folder scan cache being refreshed.
+
+Hidden and recently deleted media are excluded. Enabling PIN lock replaces all home-screen widget photos with a placeholder; unlocking widget settings does not expose them on the home screen. Widget configuration and photo views use the app's PIN/biometric lock. Removed or unavailable sources show a recovery message with access to configuration.
+
+See [WIDGET_TESTING.md](WIDGET_TESTING.md) for verification status and device checks.
 
 ## Media access
 
