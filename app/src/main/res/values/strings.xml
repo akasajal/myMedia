@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">My Media</string>
+    <string name="first_folder_title">Your gallery starts here</string>
+    <string name="first_folder_description">Choose a folder to see your photos and videos.</string>
+    <string name="add_first_folder">Add your first folder</string>
 </resources>

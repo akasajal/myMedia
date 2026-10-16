@@ -1,6 +1,10 @@
 package com.ishaan.myMedia.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
@@ -9,6 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -16,7 +22,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.ishaan.myMedia.R
 import com.ishaan.myMedia.data.model.MediaItem
 import com.ishaan.myMedia.ui.components.DateGroupHeader
 import com.ishaan.myMedia.ui.components.MediaGridRow
@@ -29,6 +39,7 @@ fun MediaScreen(
     onMediaClick: (MediaItem, Int) -> Unit,
     columns: Int,
     onColumnsChange: (Int) -> Unit,
+    onAddFolder: (Uri) -> Unit,
     listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier,
     selection: SelectionState = SelectionState(),
@@ -38,6 +49,9 @@ fun MediaScreen(
     onBulkMove: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) onAddFolder(uri)
+    }
 
     if (uiState.isLoading) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -47,12 +61,11 @@ fun MediaScreen(
     }
 
     if (uiState.allMedia.isEmpty()) {
-        EmptyState(
-            message = if (uiState.chosenFolders.isEmpty())
-                "No folders selected.\nGo to Settings to choose folders."
-            else "No media found in the selected folders.",
-            modifier = modifier,
-        )
+        if (uiState.chosenFolders.isEmpty()) {
+            FirstFolderEmptyState(onAddFolder = { folderPicker.launch(null) }, modifier = modifier)
+        } else {
+            EmptyState(message = "No media found in the selected folders.", modifier = modifier)
+        }
         return
     }
 
@@ -190,6 +203,43 @@ private fun SelectionToolbar(
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun FirstFolderEmptyState(onAddFolder: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer) {
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_foreground),
+                contentDescription = null,
+                modifier = Modifier.size(128.dp),
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = stringResource(R.string.first_folder_title),
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.first_folder_description),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = onAddFolder) {
+            Icon(Icons.Rounded.CreateNewFolder, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.add_first_folder))
         }
     }
 }

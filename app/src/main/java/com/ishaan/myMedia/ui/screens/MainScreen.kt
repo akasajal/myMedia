@@ -469,6 +469,7 @@ private fun MainScreenContent(viewModel: GalleryViewModel, snackbarHostState: Sn
                     },
                     columns         = uiState.gridColumns,
                     onColumnsChange = viewModel::updateGridColumns,
+                    onAddFolder     = viewModel::addFolder,
                     listState       = mediaListState,
                     selection       = selection,
                     onSelectionChange = { selection = it },
