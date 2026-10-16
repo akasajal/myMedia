@@ -11,12 +11,4 @@
             android:autoStart="true" android:flipInterval="60000"
             android:animateFirstView="false" />
     </FrameLayout>
-    <ImageButton android:id="@+id/widget_next" android:layout_width="48dp" android:layout_height="48dp"
-        android:layout_gravity="bottom|end" android:layout_margin="4dp"
-        android:background="@drawable/photo_widget_control" android:src="@drawable/photo_widget_next"
-        android:contentDescription="@string/widget_next" android:padding="12dp" />
-    <ImageButton android:id="@+id/widget_configure" android:layout_width="48dp" android:layout_height="48dp"
-        android:layout_gravity="top|end" android:layout_margin="4dp"
-        android:background="@drawable/photo_widget_control" android:src="@drawable/photo_widget_settings"
-        android:contentDescription="@string/widget_configure" android:padding="12dp" />
 </FrameLayout>

@@ -10,9 +10,8 @@
     <string name="widget_setup">Choose photos for your widget</string>
     <string name="widget_locked">Photos are hidden by app lock. Open widget settings to allow them on this widget.</string>
     <string name="widget_no_images">No photos available. Open widget settings to choose another source.</string>
-    <string name="widget_unreadable">Could not open this photo. Use Next or choose another source in widget settings.</string>
+    <string name="widget_unreadable">Could not open this photo. Touch and hold the widget, then choose Edit to change its source.</string>
     <string name="widget_loading">Loading photo…</string>
-    <string name="widget_next">Next photo</string>
     <string name="widget_photo_description">%1$s. Open photo in My Media.</string>
     <string name="widget_unlock">Unlock My Media</string>
     <string name="widget_use_pin">Use PIN</string>

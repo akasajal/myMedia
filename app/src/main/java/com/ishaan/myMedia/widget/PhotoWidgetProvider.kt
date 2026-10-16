@@ -41,22 +41,7 @@ class PhotoWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        if (intent.action == ACTION_NEXT) {
-            val id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
-            if (id !in AppWidgetManager.getInstance(context).getAppWidgetIds(ComponentName(context, PhotoWidgetProvider::class.java))) return
-            val config = PhotoWidgetStore(context).read(id) ?: return
-            if (widgetPhotosAllowed(PrivacyRepository(context).getPrivacyPrefs().pinEnabled, config)) {
-                AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(id,
-                    RemoteViews(context.packageName, layout(config)).apply { showNext(R.id.widget_slideshow) })
-            }
-        }
-    }
-
     companion object {
-        private const val ACTION_NEXT = "com.ishaan.myMedia.widget.NEXT"
-
         private fun layout(config: PhotoWidgetConfig?): Int = when (config?.intervalSeconds) {
             30 -> R.layout.photo_widget_30
             60 -> R.layout.photo_widget_60
@@ -78,7 +63,6 @@ class PhotoWidgetProvider : AppWidgetProvider() {
                 .setData(Uri.parse("mymedia-widget://configure/$id"))
             val configurePending = PendingIntent.getActivity(context, id, configure,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            views.setOnClickPendingIntent(R.id.widget_configure, configurePending)
             views.setOnClickPendingIntent(R.id.widget_empty, configurePending)
             views.setTextViewText(R.id.widget_empty, context.getString(when {
                 locked -> R.string.widget_locked
@@ -89,7 +73,6 @@ class PhotoWidgetProvider : AppWidgetProvider() {
                 AppWidgetManager.getInstance(context).updateAppWidget(id, views)
                 return
             }
-            views.setViewVisibility(R.id.widget_next, if (config.imageUri == null) View.VISIBLE else View.GONE)
             views.setViewVisibility(R.id.widget_slideshow, View.VISIBLE)
             views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
             run {
@@ -105,11 +88,6 @@ class PhotoWidgetProvider : AppWidgetProvider() {
                     .setData(Uri.parse("mymedia-widget://open/$id"))
                 views.setPendingIntentTemplate(R.id.widget_slideshow, PendingIntent.getActivity(context, id, open,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE))
-                val next = Intent(context, PhotoWidgetProvider::class.java).setAction(ACTION_NEXT)
-                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                    .setData(Uri.parse("mymedia-widget://next/$id"))
-                views.setOnClickPendingIntent(R.id.widget_next, PendingIntent.getBroadcast(context, id, next,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
             }
             AppWidgetManager.getInstance(context).updateAppWidget(id, views)
         }
