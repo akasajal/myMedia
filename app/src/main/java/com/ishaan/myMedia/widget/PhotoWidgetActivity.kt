@@ -215,11 +215,12 @@ private fun WidgetConfiguration(
         }
     }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item {
-                Box(Modifier.fillMaxWidth().aspectRatio(2f).clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                    if (candidates.isNotEmpty()) AsyncImage(candidates.first().uri, stringResource(R.string.widget_preview),
-                        modifier = Modifier.fillMaxSize(), contentScale = if (fit) ContentScale.Fit else ContentScale.Crop)
-                    else Text(stringResource(R.string.widget_choose_source), modifier = Modifier.padding(16.dp))
+            if (candidates.isNotEmpty()) {
+                item(key = "preview") {
+                    AsyncImage(candidates.first().uri, stringResource(R.string.widget_preview),
+                        modifier = Modifier.fillMaxWidth().aspectRatio(2f).clip(MaterialTheme.shapes.large)
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentScale = if (fit) ContentScale.Fit else ContentScale.Crop)
                 }
             }
             item {

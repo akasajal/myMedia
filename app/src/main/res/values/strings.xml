@@ -18,7 +18,6 @@
     <string name="widget_use_pin">Use PIN</string>
     <string name="widget_back">Back</string>
     <string name="widget_preview">Widget preview</string>
-    <string name="widget_choose_source">Choose an image or folder below</string>
     <string name="widget_source">Photo source</string>
     <string name="widget_single_image">A particular image</string>
     <string name="widget_one_folder">One folder</string>
