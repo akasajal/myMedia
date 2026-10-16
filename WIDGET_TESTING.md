@@ -12,6 +12,7 @@ No APK was assembled or installed as part of these checks. The following launche
 
 - Add a widget, cancel configuration, and confirm the launcher removes the unconfigured instance.
 - Configure a single image; verify preview, fit/fill framing, image opening, zoom, and back navigation.
+- Edit an existing widget without changing its interval: choose a different image, switch between image/folder/multiple-folder sources, change fit/fill and shuffle, and save. Verify each save immediately replaces the displayed collection and framing. Repeat saves to exercise both root layouts. Change the interval separately and verify the new timing applies; cancel an edit and verify its changes do not apply.
 - Configure one folder, then multiple overlapping folders; verify images occur once, descendants are included, and videos are excluded.
 - Verify 15-second, 30-second, 1-minute, and 5-minute intervals. Ensure the launcher does not override them with its own automatic-advance interval.
 - Turn the screen off midway through an interval, wait longer than several intervals, then return. Verify the slideshow did not advance while hidden and starts a fresh interval. Native flippers do not preserve the remainder of an interrupted interval.

@@ -17,6 +17,10 @@ Entries describe application behavior; the audit records the individual accessib
 
 - Kotlin/resource compilation and all 12 local unit tests passed. Launcher rendering, rotation, screen-off behavior, resizing, and accessibility require device verification; see `WIDGET_TESTING.md`.
 
+### Fixed
+
+- Saving widget configuration now invalidates the photo collection and replaces the slideshow view, preventing cached photos and framing from surviving edits at the same rotation interval.
+
 ## 1.1
 
 ### Added

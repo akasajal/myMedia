@@ -12,6 +12,7 @@ data class PhotoWidgetConfig(
     val shuffle: Boolean = false,
     val fit: Boolean = false,
     val allowWhileLocked: Boolean = false,
+    val revision: Long = 0,
 )
 
 internal fun widgetPhotosAllowed(lockEnabled: Boolean, config: PhotoWidgetConfig?): Boolean =
@@ -54,6 +55,7 @@ class PhotoWidgetStore(context: Context) {
                 shuffle = json.optBoolean("shuffle"),
                 fit = json.optBoolean("fit"),
                 allowWhileLocked = json.optBoolean("allowWhileLocked", false),
+                revision = json.optLong("revision", 0),
             )
         }
     } catch (_: Exception) { null }
@@ -66,6 +68,8 @@ class PhotoWidgetStore(context: Context) {
             put("shuffle", config.shuffle)
             put("fit", config.fit)
             put("allowWhileLocked", config.allowWhileLocked)
+            // Each save must replace the launcher's existing slideshow, even at the same interval.
+            put("revision", (read(id)?.revision ?: 0) + 1)
         }
         prefs.edit().putString(id.toString(), json.toString()).apply()
     }

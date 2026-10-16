@@ -42,11 +42,16 @@ class PhotoWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        private fun layout(config: PhotoWidgetConfig?): Int = when (config?.intervalSeconds) {
-            30 -> R.layout.photo_widget_30
-            60 -> R.layout.photo_widget_60
-            300 -> R.layout.photo_widget_300
-            else -> R.layout.photo_widget_15
+        private fun layout(config: PhotoWidgetConfig): Int {
+            // Different root resource IDs force AppWidgetHostView to inflate a new flipper.
+            // Reapplying the same layout can retain its displayed child and cached row views.
+            val alternate = config.revision % 2L != 0L
+            return when (config.intervalSeconds) {
+                30 -> if (alternate) R.layout.photo_widget_30_alternate else R.layout.photo_widget_30
+                60 -> if (alternate) R.layout.photo_widget_60_alternate else R.layout.photo_widget_60
+                300 -> if (alternate) R.layout.photo_widget_300_alternate else R.layout.photo_widget_300
+                else -> if (alternate) R.layout.photo_widget_15_alternate else R.layout.photo_widget_15
+            }
         }
 
         fun updateAll(context: Context) {
@@ -76,10 +81,10 @@ class PhotoWidgetProvider : AppWidgetProvider() {
             views.setViewVisibility(R.id.widget_slideshow, View.VISIBLE)
             views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
             run {
-                // A fresh adapter identity discards launcher-cached rows after privacy/library changes.
+                // Each configuration has its own collection; routine refreshes invalidate its rows below.
                 val adapter = Intent(context, PhotoWidgetService::class.java)
                     .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                    .setData(Uri.parse("mymedia-widget://adapter/$id/${System.nanoTime()}"))
+                    .setData(Uri.parse("mymedia-widget://adapter/$id/${config.revision}"))
                 views.setRemoteAdapter(R.id.widget_slideshow, adapter)
                 views.setEmptyView(R.id.widget_slideshow, R.id.widget_empty)
                 val open = Intent(context, PhotoWidgetActivity::class.java)
@@ -90,6 +95,8 @@ class PhotoWidgetProvider : AppWidgetProvider() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE))
             }
             AppWidgetManager.getInstance(context).updateAppWidget(id, views)
+            // Updating RemoteViews alone does not invalidate a collection adapter's data.
+            AppWidgetManager.getInstance(context).notifyAppWidgetViewDataChanged(id, R.id.widget_slideshow)
         }
     }
 }
