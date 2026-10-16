@@ -17,6 +17,7 @@ See [CHANGELOG.md](CHANGELOG.md) for **v1.2** and earlier changes.
 - **Appearance:** System / Dark / Light controls and six accent colors: Rose, Purple, Green, Teal, Gold, and Slate. Preferences persist across restarts.
 - **Privacy:** four-digit PIN, optional strong biometrics, Instant Lock, and protected recent-app previews when PIN lock is enabled.
 - **Photo widget:** a resizable home-screen widget showing one image or a slideshow from one or more folders, with fit/fill framing, shuffle, and separate settings for each widget.
+- **About and legal:** app version and sajal’s GitHub profile at the bottom of Settings, followed by offline Terms of Use and Privacy Policy documents covering media access, local data, sharing, file operations, widgets, and Android backup.
 
 ## Photo widget
 

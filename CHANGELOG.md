@@ -6,6 +6,7 @@ Entries describe application behavior; the audit records the individual accessib
 
 ### Added
 
+- About at the bottom of Settings, showing the app version and an accent-colored sajal link to GitHub, followed by offline Terms of Use and Privacy Policy screens.
 - A resizable 8 rows × 6 columns home-screen photo widget with single-image, single-folder, and multiple-folder sources, plus a configuration preview.
 - Folder slideshow intervals of 15 seconds, 30 seconds, 1 minute, and 5 minutes, with shuffle, fit/fill framing, and independent configuration per widget. Photos have no overlaid buttons; reconfiguration uses the launcher's long-press Edit/settings action.
 - Launcher-managed slideshow rotation without a persistent background service. Hidden-window time does not advance the slideshow; returning starts a fresh interval rather than resuming the partial countdown.

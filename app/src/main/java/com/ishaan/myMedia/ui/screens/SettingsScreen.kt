@@ -27,6 +27,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +40,7 @@ import com.ishaan.myMedia.data.model.DeletedItem
 import com.ishaan.myMedia.data.model.PrivacyPrefs
 import com.ishaan.myMedia.ui.components.PinSetupDialog
 import com.ishaan.myMedia.viewmodel.GalleryUiState
+import com.ishaan.myMedia.R
 import java.util.*
 
 @Composable
@@ -53,6 +56,7 @@ fun SettingsScreen(
     onOpenRecycleBin: () -> Unit,
     onOpenMediaFolders: () -> Unit,
     onAccentColorChange: (AccentColor) -> Unit,
+    onOpenLegalDocument: (LegalDocument) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
@@ -121,6 +125,53 @@ fun SettingsScreen(
         item { SettingsSection("Storage") }
         item {
             StorageAnalytics(totalSize = uiState.totalStorageUsage)
+        }
+
+        item { SettingsSection(stringResource(R.string.about_heading)) }
+        item { AboutApp() }
+        item {
+            LegalSettingsRow(stringResource(R.string.terms_title), Icons.Rounded.Description) {
+                onOpenLegalDocument(LegalDocument.TERMS)
+            }
+        }
+        item {
+            LegalSettingsRow(stringResource(R.string.privacy_policy_title), Icons.Rounded.Policy) {
+                onOpenLegalDocument(LegalDocument.PRIVACY)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AboutApp() {
+    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val version = remember(context) { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(stringResource(R.string.about_app_version, version), style = MaterialTheme.typography.titleMedium)
+            FlowRow(verticalArrangement = Arrangement.Center) {
+                Text(stringResource(R.string.about_developed_by), modifier = Modifier.align(Alignment.CenterVertically),
+                    style = MaterialTheme.typography.bodyLarge)
+                TextButton(
+                    onClick = { uriHandler.openUri("https://github.com/akasajal") },
+                    contentPadding = PaddingValues(horizontal = 4.dp),
+                    modifier = Modifier.semantics { contentDescription = context.getString(R.string.about_developer_link) },
+                ) { Text("sajal", style = MaterialTheme.typography.bodyLarge) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LegalSettingsRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
         }
     }
 }

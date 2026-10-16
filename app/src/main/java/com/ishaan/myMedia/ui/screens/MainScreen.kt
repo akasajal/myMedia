@@ -125,6 +125,7 @@ private fun MainScreenContent(viewModel: GalleryViewModel, snackbarHostState: Sn
 
     var showRecycleBin   by rememberSaveable { mutableStateOf(false) }
     var showMediaFolders by rememberSaveable { mutableStateOf(false) }
+    var legalDocument by rememberSaveable { mutableStateOf<LegalDocument?>(null) }
 
     var itemToDelete by remember { mutableStateOf<MediaItem?>(null) }
     var itemToMove   by remember { mutableStateOf<MediaItem?>(null) }
@@ -148,7 +149,7 @@ private fun MainScreenContent(viewModel: GalleryViewModel, snackbarHostState: Sn
         if (activeAlbumId == null) albumSelection = SelectionState()
     }
 
-    BackHandler(enabled = selection.isActive || albumSelection.isActive || editingItem != null || itemToMove != null || playingVideo != null || viewerState != null || activeAlbum != null || showRecycleBin || showMediaFolders || activeTab != NavTab.MEDIA) {
+    BackHandler(enabled = selection.isActive || albumSelection.isActive || editingItem != null || itemToMove != null || playingVideo != null || viewerState != null || activeAlbum != null || showRecycleBin || showMediaFolders || legalDocument != null || activeTab != NavTab.MEDIA) {
         when {
             albumSelection.isActive -> albumSelection = SelectionState()
             selection.isActive  -> selection = SelectionState()
@@ -159,6 +160,7 @@ private fun MainScreenContent(viewModel: GalleryViewModel, snackbarHostState: Sn
             activeAlbum != null -> activeAlbumId = null
             showRecycleBin      -> showRecycleBin = false
             showMediaFolders    -> showMediaFolders = false
+            legalDocument != null -> legalDocument = null
             activeTab != NavTab.MEDIA -> activeTab = NavTab.MEDIA
         }
     }
@@ -414,6 +416,11 @@ private fun MainScreenContent(viewModel: GalleryViewModel, snackbarHostState: Sn
         return
     }
 
+    legalDocument?.let { document ->
+        key(document) { LegalDocumentScreen(document, onBack = { legalDocument = null }) }
+        return
+    }
+
     // ── Main scaffold ─────────────────────────────────────────────────────
 
     Scaffold(
@@ -524,6 +531,7 @@ private fun MainScreenContent(viewModel: GalleryViewModel, snackbarHostState: Sn
                     onSetInstantLock    = viewModel::setInstantLockEnabled,
                     onOpenRecycleBin    = { showRecycleBin = true },
                     onOpenMediaFolders  = { showMediaFolders = true },
+                    onOpenLegalDocument = { legalDocument = it },
                 )
             }
         }

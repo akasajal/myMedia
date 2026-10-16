@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="about_heading">ABOUT</string>
+    <string name="about_app_version">myMedia - v%1$s</string>
+    <string name="about_developed_by">-developed by</string>
+    <string name="about_developer_link">sajal on GitHub, opens in browser</string>
+    <string name="terms_title">Terms of Use</string>
+    <string name="privacy_policy_title">Privacy Policy</string>
+    <string name="legal_updated">Last updated: 16 October 2026</string>
+    <string name="legal_contact">Contact sajal on GitHub</string>
+
+    <string-array name="terms_headings">
+        <item>About myMedia</item>
+        <item>Your files and permissions</item>
+        <item>Editing and file operations</item>
+        <item>App lock and home-screen widgets</item>
+        <item>Availability and your rights</item>
+        <item>Updates and contact</item>
+    </string-array>
+    <string-array name="terms_paragraphs">
+        <item>myMedia is a local Android gallery developed by sajal. These terms describe use of its browsing, organization, editing, playback, and photo-widget features. The app does not require an account or subscription.</item>
+        <item>Your photos and videos remain yours. Only access, edit, or share files you have permission to use. You choose which folders the app can access and can revoke permissions through Android settings. Removing a folder from myMedia stops managing it; it does not delete the original folder.</item>
+        <item>Keep separate backups of important files. Move, copy, editing, and deletion depend on available storage and the file provider. Editor saves create a new image. Moving changes a file’s location. Removing an item through the recycle bin first hides it within myMedia; permanent deletion and expiry cleanup attempt to delete the underlying file. The recycle bin is not a backup, and another app may still access an item before physical deletion.</item>
+        <item>App lock limits access through myMedia; it does not encrypt files or prevent other apps with permission from reading them. If you allow a widget to show photos while app lock is enabled, anyone who can see your home screen may see those photos. Opening photos or widget settings still requires authentication when app lock is enabled. Widget timing, sizing, and long-press menus depend on Android and your launcher.</item>
+        <item>The app is provided as available, without a promise of uninterrupted or error-free operation, successful file recovery, or compatibility with every device and file provider. Nothing in these terms limits rights or protections that applicable law does not allow to be limited.</item>
+        <item>Features and these terms may change in future releases. The date above identifies this version. For questions or issue reports, contact sajal at github.com/akasajal. GitHub is an external service with its own terms and privacy practices.</item>
+    </string-array>
+
+    <string-array name="privacy_headings">
+        <item>Who provides the app</item>
+        <item>Media access and use</item>
+        <item>Data stored on your device</item>
+        <item>App lock and biometrics</item>
+        <item>Widget photo visibility</item>
+        <item>Sharing and external links</item>
+        <item>Retention, deletion, and Android backup</item>
+        <item>Your choices and contact</item>
+    </string-array>
+    <string-array name="privacy_paragraphs">
+        <item>myMedia is developed by sajal (github.com/akasajal). This notice explains how this version handles your media and settings. The app has no account system, advertising, analytics, or developer-operated upload service, and requests no internet permission.</item>
+        <item>With your permission, myMedia reads images and videos from selected folders and Android’s media library. It uses file names, locations and content URIs, dates, sizes, media types, dimensions, and video durations to display, sort, organize, and play media. Photos may contain embedded metadata, which the app can read for media details. Folder access is granted through Android’s system picker; library access may cover photos, videos, or selected items, depending on your Android version.</item>
+        <item>The app stores preferences, selected folder references, folder visibility, favorites, cached media listings, recycle-bin records, and widget settings in local app storage. It caches decoded images and thumbnails to improve loading. Media decoding uses on-device libraries. Original media stays in its existing location unless you request a move, edit save, or permanent deletion.</item>
+        <item>The PIN is stored as a SHA-256 hash rather than plain text. Biometric authentication is handled by Android; myMedia receives an authentication result, not your fingerprint or face template. App lock and hidden folders are app-level access and display controls, not file encryption. Other apps with file access may still read the originals. Recent-app preview protection depends on Android; older versions also restrict screenshots when PIN lock is enabled.</item>
+        <item>Android’s launcher receives the image frames needed to display your widget. Showing photos while app lock is enabled defaults to off. Turning it on requires an Allow/Deny confirmation for that widget. If allowed, its selected photos remain visible on the home screen while myMedia is locked. You can revoke this choice in widget settings. Hidden and recently deleted media are excluded; opening a photo or configuration still requires authentication when app lock is enabled.</item>
+        <item>myMedia does not automatically upload media to the developer. When you choose Share, Android passes the selected media to the app you choose; that app’s handling is governed by its own privacy practices. Tapping the developer link opens GitHub in your browser, which may send information to GitHub independently of myMedia. Information you voluntarily submit to GitHub is handled by GitHub.</item>
+        <item>Preferences and cache entries remain until changed, refreshed, cleared, or removed with the app. Recycle-bin records normally remain for up to 30 days; when expired records are loaded, the app attempts physical deletion. Permanent deletion and provider failures can affect whether a file is actually removed. Clearing app data or uninstalling does not delete original media or exported edits. Android backup is enabled: depending on your device, backup transport, and system settings, Android may back up and restore app preferences and records. This is controlled by Android, separately from any developer service.</item>
+        <item>You can remove selected folders, change visibility, delete widgets, change widget disclosure choices, revoke storage permissions in Android settings, and clear app data or uninstall. To manage device backups, use Android’s backup settings. For privacy questions, contact sajal at github.com/akasajal using the link below. This notice will be updated if the app’s data handling changes.</item>
+    </string-array>
+</resources>
