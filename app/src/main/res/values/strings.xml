@@ -5,7 +5,7 @@
     <string name="first_folder_description">Choose a folder to see your photos and videos.</string>
     <string name="add_first_folder">Add your first folder</string>
     <string name="widget_name">My Media Photos</string>
-    <string name="widget_description">A wide photo widget for an image or a slideshow from your folders.</string>
+    <string name="widget_description">A resizable photo widget for an image or a slideshow from your folders.</string>
     <string name="widget_configure">Photo widget settings</string>
     <string name="widget_setup">Choose photos for your widget</string>
     <string name="widget_locked">Photos are hidden by app lock. Open widget settings to allow them on this widget.</string>

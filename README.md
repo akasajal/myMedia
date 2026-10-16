@@ -16,11 +16,11 @@ See [CHANGELOG.md](CHANGELOG.md) for **v1.2** and earlier changes.
 - **Recently deleted:** restore entries or permanently delete them. Deleting initially hides the item in the app's recycle bin; physical deletion happens on permanent deletion or an expiry cleanup attempt when the bin is loaded.
 - **Appearance:** System / Dark / Light controls and six accent colors: Rose, Purple, Green, Teal, Gold, and Slate. Preferences persist across restarts.
 - **Privacy:** four-digit PIN, optional strong biometrics, Instant Lock, and protected recent-app previews when PIN lock is enabled.
-- **Photo widget:** a resizable wide home-screen widget showing one image or a slideshow from one or more folders, with fit/fill framing, shuffle, and separate settings for each widget.
+- **Photo widget:** a resizable home-screen widget showing one image or a slideshow from one or more folders, with fit/fill framing, shuffle, and separate settings for each widget.
 
 ## Photo widget
 
-Open your launcher's widget picker, choose **My Media Photos**, and place the widget. Select a particular image, one folder, or multiple folders, then tap **Add widget**. You can also add a folder to the app from this configuration screen. The default size is 4 × 2 cells; actual sizing depends on the launcher.
+Open your launcher's widget picker, choose **My Media Photos**, and place the widget. Select a particular image, one folder, or multiple folders, then tap **Add widget**. You can also add a folder to the app from this configuration screen. The default size is 6 rows × 6 columns; actual sizing depends on the launcher and available grid space.
 
 Folder slideshows include photos from descendants and combine overlapping selections without duplicate files. Choose a 15-second, 30-second, 1-minute, or 5-minute interval. Shuffle changes the order when the collection reloads. GIFs appear as still frames; videos are excluded. Tap a photo to open a zoomable view. To reconfigure, touch and hold the widget and choose the launcher's Edit/settings action. This uses Android's reconfigurable-widget support; the menu wording and availability depend on the launcher. The widget has no overlaid controls. Empty or locked placeholders can also be tapped to open configuration.
 
