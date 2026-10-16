@@ -26,6 +26,7 @@ Changes prepared for v1.1. Entries describe application behavior; the audit reco
 
 ### Fixed
 
+- Reduced scrolling overhead by moving refresh processing off the UI thread, coalescing overlapping loads, preserving the grid during refreshes, caching folder lookups and row data, and simplifying thumbnail loading.
 - Album contents, Favorites, the Albums overview, and Settings losing their scroll position after navigating away and returning.
 - Rapid double-tap zoom animations drifting images out of frame, and interrupted double-taps choosing the wrong zoom direction.
 - Duplicate listings of the same file from MediaStore and SAF, including background refreshes and overlapping selected folders.

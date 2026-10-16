@@ -1,7 +1,6 @@
 package com.ishaan.myMedia.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.*
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -28,7 +26,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
+import androidx.compose.ui.graphics.painter.ColorPainter
 import coil.request.ImageRequest
 import com.ishaan.myMedia.data.model.MediaItem
 import com.ishaan.myMedia.data.model.MediaType
@@ -36,38 +35,13 @@ import com.ishaan.myMedia.ui.theme.PrimaryAccent
 import com.ishaan.myMedia.ui.theme.AccentForeground
 import com.ishaan.myMedia.ui.theme.SoftPurple
 
-// ── Shimmer brush ─────────────────────────────────────────────────────────────
-
-@Composable
-fun shimmerBrush(): Brush {
-    val shimmerColors = listOf(
-        MaterialTheme.colorScheme.surfaceVariant,
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        MaterialTheme.colorScheme.surfaceVariant,
-    )
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val translateAnim by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmer_translate"
-    )
-    return Brush.linearGradient(
-        colors = shimmerColors,
-        start = Offset(translateAnim - 300f, 0f),
-        end = Offset(translateAnim, 0f),
-    )
-}
-
 // ── Media thumbnail with selection support ────────────────────────────────────
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaThumbnail(
     item: MediaItem,
+    thumbnailSizePx: Int,
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 0.dp,
     isSelected: Boolean = false,
@@ -75,6 +49,19 @@ fun MediaThumbnail(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val context = LocalContext.current
+    val placeholderColor = MaterialTheme.colorScheme.surfaceVariant
+    val placeholder = remember(placeholderColor) { ColorPainter(placeholderColor) }
+    val request = remember(context, item.uri, item.mediaType, item.dateTaken, item.size, thumbnailSizePx) {
+        ImageRequest.Builder(context)
+            .data(item.uri)
+            .size(thumbnailSizePx.coerceAtLeast(1))
+            .apply { if (item.mediaType == MediaType.VIDEO) setParameter("videoFrameMicros", 1_000_000L) }
+            .crossfade(false)
+            .memoryCacheKey("thumbnail:${item.uri}:${item.dateTaken}:${item.size}:$thumbnailSizePx")
+            .diskCacheKey(item.uri.toString())
+            .build()
+    }
     val overlayColor by animateColorAsState(
         targetValue = if (isSelected) Color.Black.copy(alpha = 0.35f) else Color.Transparent,
         label = "selection_overlay"
@@ -111,28 +98,13 @@ fun MediaThumbnail(
                 else Modifier
             )
     ) {
-        SubcomposeAsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(item.uri)
-                .apply {
-                    if (item.mediaType == MediaType.VIDEO) {
-                        setParameter("videoFrameMicros", 1_000_000L)
-                    }
-                }
-                .crossfade(true)
-                .memoryCacheKey(item.id.toString())
-                .diskCacheKey(item.id.toString())
-                .build(),
+        AsyncImage(
+            model = request,
+            placeholder = placeholder,
+            error = placeholder,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
-            loading = {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(shimmerBrush())
-                )
-            },
         )
 
         // Selection overlay

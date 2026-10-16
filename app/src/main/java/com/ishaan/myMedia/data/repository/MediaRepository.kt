@@ -20,6 +20,10 @@ import com.ishaan.myMedia.data.model.MediaItem
 import com.ishaan.myMedia.data.model.MediaType
 import com.ishaan.myMedia.data.model.SortOrder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -29,6 +33,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class MediaRepository(private val context: Context) {
+    private var folderCacheSource: Set<String>? = null
+    private var cachedDocumentFolders: Map<String, Uri> = emptyMap()
 
     // ── Favorites (persisted via SharedPreferences) ───────────────────────
     private val prefs = context.getSharedPreferences("gallery_prefs", Context.MODE_PRIVATE)
@@ -154,6 +160,13 @@ class MediaRepository(private val context: Context) {
     fun getChosenFolders(): Set<String> =
         getSafUris().mapNotNull { safUriToDisplayPath(Uri.parse(it)) }.toSet()
 
+    fun loadConfigurationKey(): String {
+        val permissions = listOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+        return getSafUris().sorted().joinToString("|") + ":" + getSortOrder().name + ":" +
+            permissions.joinToString { ContextCompat.checkSelfPermission(context, it).toString() }
+    }
+
     // ── All discovered folders ──────────────────────────────────────────
     private fun getAllDiscoveredFolders(): Set<String> =
         prefs.getStringSet("discovered_folders", emptySet()) ?: emptySet()
@@ -278,6 +291,11 @@ class MediaRepository(private val context: Context) {
 
     fun calculateStorageUsage(items: List<MediaItem>): Long = items.sumOf { it.size }
 
+    fun filterVisibleMedia(items: List<MediaItem>): List<MediaItem> {
+        val visibility = mutableMapOf<String, Boolean>()
+        return items.filter { visibility.getOrPut(it.albumId) { isFolderVisible(it.albumId) } }
+    }
+
     fun sortItems(items: List<MediaItem>, order: SortOrder): List<MediaItem> = when (order) {
         SortOrder.DATE_DESC -> items.sortedByDescending { it.dateTaken }
         SortOrder.DATE_ASC  -> items.sortedBy { it.dateTaken }
@@ -371,6 +389,8 @@ class MediaRepository(private val context: Context) {
             try {
                 val treeUri = Uri.parse(uriString)
                 allDiscovered += scanSafTree(treeUri)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -457,11 +477,12 @@ class MediaRepository(private val context: Context) {
         val rootUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeId)
         val displayPath = safUriToDisplayPath(treeUri) ?: ""
 
-        recursiveScanSafOptimized(rootUri, treeUri, displayPath, result)
+        recursiveScanSafOptimized(rootUri, treeUri, displayPath, result, currentCoroutineContext()[Job])
         result
     }
 
-    private fun recursiveScanSafOptimized(parentUri: Uri, treeUri: Uri, albumPath: String, result: MutableList<MediaItem>) {
+    private fun recursiveScanSafOptimized(parentUri: Uri, treeUri: Uri, albumPath: String, result: MutableList<MediaItem>, job: Job?) {
+        job?.ensureActive()
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, DocumentsContract.getDocumentId(parentUri))
 
         val projection = arrayOf(
@@ -480,6 +501,7 @@ class MediaRepository(private val context: Context) {
             val dateCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
 
             while (cursor.moveToNext()) {
+                job?.ensureActive()
                 val docId = cursor.getString(idCol)
                 val name  = cursor.getString(nameCol)
                 val mime  = cursor.getString(mimeCol)
@@ -491,7 +513,7 @@ class MediaRepository(private val context: Context) {
                     val subAlbumPath = if (albumPath.isEmpty()) name else "$albumPath/$name"
                     addDiscoveredFolder(subAlbumPath)
                     prefs.edit().putString("folder_uri_$subAlbumPath", uri.toString()).apply()
-                    recursiveScanSafOptimized(uri, treeUri, subAlbumPath, result)
+                    recursiveScanSafOptimized(uri, treeUri, subAlbumPath, result, job)
                 } else if (mime.startsWith("image/") || mime.startsWith("video/")) {
                     // use 64-bit hash to avoid collisions from 32-bit hashCode()
                     val uriStr = uri.toString()
@@ -646,7 +668,7 @@ class MediaRepository(private val context: Context) {
 
     fun folderUriForPath(path: String): Uri? {
         prefs.getString("folder_uri_$path", null)?.let { return Uri.parse(it) }
-        getSafCache().firstOrNull { it.albumId == path && it.parentUri != null }?.parentUri?.let { return it }
+        cachedDocumentFolders()[path]?.let { return it }
         val roots = getSafUris().mapNotNull { value ->
             val uri = Uri.parse(value)
             safUriToDisplayPath(uri)?.let { it to uri }
@@ -664,6 +686,19 @@ class MediaRepository(private val context: Context) {
         return null
     }
 
+    @Synchronized
+    private fun cachedDocumentFolders(): Map<String, Uri> {
+        val source = prefs.getStringSet("saf_cache", emptySet()).orEmpty()
+        if (source != folderCacheSource) {
+            cachedDocumentFolders = source.mapNotNull { entry ->
+                val item = deserializeMediaItem(entry) ?: return@mapNotNull null
+                item.parentUri?.let { item.albumId to it }
+            }.toMap()
+            folderCacheSource = source
+        }
+        return cachedDocumentFolders
+    }
+
     suspend fun createAlbum(name: String, parent: Album) = withContext(Dispatchers.IO) {
         val cleanName = name.trim()
         require(cleanName.isNotEmpty() && cleanName !in setOf(".", "..") && '/' !in cleanName && '\\' !in cleanName) { "Enter a valid folder name" }
@@ -677,14 +712,16 @@ class MediaRepository(private val context: Context) {
     }
 
     suspend fun buildDestinationAlbums(media: List<MediaItem>): List<Album> = withContext(Dispatchers.IO) {
+        val grouped = media.groupBy { it.albumId }
         val roots = getChosenFolders()
         val paths = roots + getAllDiscoveredFolders() + media.map { it.albumId }
         paths.filter { path ->
             isFolderVisible(path) && roots.any { path == it || path.startsWith("${it.trimEnd('/')}/") }
         }.mapNotNull { path ->
             val uri = folderUriForPath(path) ?: return@mapNotNull null
-            Album(path, path.substringAfterLast('/'), media.firstOrNull { it.albumId == path }?.uri,
-                media.count { it.albumId == path }, folderUri = uri)
+            val items = grouped[path].orEmpty()
+            Album(path, path.substringAfterLast('/'), items.firstOrNull()?.uri,
+                items.size, folderUri = uri)
         }.sortedBy { it.name.lowercase() }
     }
 
@@ -693,13 +730,15 @@ class MediaRepository(private val context: Context) {
         val today     = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }
         val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1); set(Calendar.HOUR_OF_DAY, 0) }
         val monthFmt  = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+        val cal = Calendar.getInstance()
+        val monthLabels = mutableMapOf<Pair<Int, Int>, String>()
 
         return items.groupBy { item ->
-            val cal = Calendar.getInstance().apply { timeInMillis = item.dateTaken }
+            cal.timeInMillis = item.dateTaken
             when {
                 isSameDay(cal, today)     -> "Today"
                 isSameDay(cal, yesterday) -> "Yesterday"
-                else -> monthFmt.format(Date(item.dateTaken))
+                else -> monthLabels.getOrPut(cal.get(Calendar.YEAR) to cal.get(Calendar.MONTH)) { monthFmt.format(Date(item.dateTaken)) }
             }
         }.map { (label, items) -> MediaGroup(label, items) }
     }

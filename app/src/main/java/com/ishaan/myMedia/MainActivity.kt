@@ -80,7 +80,7 @@ class MainActivity : FragmentActivity() {
             }
 
             GalleryTheme(darkTheme = isDark, accentColor = uiState.accentColor) {
-                PermissionGate(onPermissionsChanged = viewModel::loadMedia) {
+                PermissionGate(onPermissionsChanged = viewModel::refreshMediaOnResume) {
                     if (uiState.isLocked) {
                         LockScreen(
                             useBiometrics           = uiState.privacyPrefs.biometricsEnabled,
@@ -156,7 +156,6 @@ fun PermissionGate(onPermissionsChanged: () -> Unit, onGranted: @Composable () -
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    LaunchedEffect(Unit) { refreshAccess() }
 
     if (hasPermission || folderOnly) {
         onGranted()

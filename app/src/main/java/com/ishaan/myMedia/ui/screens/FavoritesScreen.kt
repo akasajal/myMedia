@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -31,8 +32,8 @@ fun FavoritesScreen(
         return
     }
 
-    val visibleIds = uiState.allMedia.map { it.id }.toSet()
-    val flatFavs = uiState.favorites.filter { it.id in visibleIds }
+    val visibleIds = remember(uiState.allMedia) { uiState.allMedia.map { it.id }.toSet() }
+    val flatFavs = remember(uiState.favorites, visibleIds) { uiState.favorites.filter { it.id in visibleIds } }
 
     if (flatFavs.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -58,12 +59,16 @@ fun FavoritesScreen(
         return
     }
 
-    val favoriteGroups = uiState.mediaGroups.mapNotNull { group ->
-        val filtered = group.items.filter { groupItem ->
-            flatFavs.any { fav -> fav.id == groupItem.id }
+    val favoriteGroups = remember(uiState.mediaGroups, flatFavs) {
+        val favoriteIds = flatFavs.map { it.id }.toSet()
+        uiState.mediaGroups.mapNotNull { group ->
+            val filtered = group.items.filter { groupItem ->
+                groupItem.id in favoriteIds
+            }
+            if (filtered.isEmpty()) null else group.copy(items = filtered)
         }
-        if (filtered.isEmpty()) null else group.copy(items = filtered)
     }
+    val groupedRows = remember(favoriteGroups, columns) { favoriteGroups.map { it to it.items.chunked(columns) } }
 
     LazyColumn(
         state = listState,
@@ -72,10 +77,9 @@ fun FavoritesScreen(
             .pinchToAdjustColumns(columns, onColumnsChange),
         contentPadding = PaddingValues(bottom = 80.dp),
     ) {
-        favoriteGroups.forEach { group ->
-            item(key = "fav_header_${group.label}") { DateGroupHeader(group.label) }
-            val rows = group.items.chunked(columns)
-            itemsIndexed(rows, key = { i, _ -> "fav_row_${group.label}_$i" }) { _, row ->
+        groupedRows.forEach { (group, rows) ->
+            item(key = "fav_header_${group.label}", contentType = "dateHeader") { DateGroupHeader(group.label) }
+            itemsIndexed(rows, key = { i, _ -> "fav_row_${group.label}_$i" }, contentType = { _, _ -> "mediaRow" }) { _, row ->
                 MediaGridRow(
                     items   = row,
                     columns = columns,

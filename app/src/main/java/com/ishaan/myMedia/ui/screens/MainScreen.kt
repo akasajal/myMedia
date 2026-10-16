@@ -353,7 +353,12 @@ private fun MainScreenContent(viewModel: GalleryViewModel, snackbarHostState: Sn
     }
 
     activeAlbum?.let { album ->
-        val groups = viewModel.getGroupsForAlbum(album.id)
+        val groups = remember(uiState.mediaGroups, album.id) {
+            uiState.mediaGroups.mapNotNull { group ->
+                val items = group.items.filter { it.albumId == album.id }
+                if (items.isEmpty()) null else group.copy(items = items)
+            }
+        }
         AlbumDetailScreen(
             album             = album,
             listState         = albumListState,

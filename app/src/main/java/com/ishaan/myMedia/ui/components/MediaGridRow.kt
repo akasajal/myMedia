@@ -2,8 +2,10 @@ package com.ishaan.myMedia.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.ishaan.myMedia.data.model.MediaItem
 
@@ -20,6 +22,7 @@ fun MediaGridRow(
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val gap         = 2.dp
     val cellSize    = (screenWidth - gap * (columns - 1)) / columns
+    val thumbnailSizePx = with(LocalDensity.current) { cellSize.roundToPx() }
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -28,15 +31,18 @@ fun MediaGridRow(
         repeat(columns) { idx ->
             if (idx < items.size) {
                 val item = items[idx]
-                MediaThumbnail(
-                    item            = item,
-                    modifier        = Modifier.size(cellSize),
-                    cornerRadius    = 0.dp,
-                    isSelected      = item.id in selectedIds,
-                    selectionActive = selectionActive,
-                    onClick         = { onItemClick(item) },
-                    onLongClick     = onItemLongClick?.let { handler -> { handler(item) } },
-                )
+                key(item.id) {
+                    MediaThumbnail(
+                        item            = item,
+                        thumbnailSizePx = thumbnailSizePx,
+                        modifier        = Modifier.size(cellSize),
+                        cornerRadius    = 0.dp,
+                        isSelected      = item.id in selectedIds,
+                        selectionActive = selectionActive,
+                        onClick         = { onItemClick(item) },
+                        onLongClick     = onItemLongClick?.let { handler -> { handler(item) } },
+                    )
+                }
             } else {
                 Spacer(modifier = Modifier.size(cellSize))
             }

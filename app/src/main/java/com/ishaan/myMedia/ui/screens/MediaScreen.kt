@@ -56,7 +56,8 @@ fun MediaScreen(
         return
     }
 
-    val flatItems = uiState.mediaGroups.flatMap { it.items }
+    val flatItems = remember(uiState.mediaGroups) { uiState.mediaGroups.flatMap { it.items } }
+    val groupedRows = remember(uiState.mediaGroups, columns) { uiState.mediaGroups.map { it to it.items.chunked(columns) } }
 
     val showScrollToTop by remember {
         derivedStateOf { listState.firstVisibleItemIndex > 2 }
@@ -77,12 +78,11 @@ fun MediaScreen(
                 bottom = 80.dp,
             ),
         ) {
-            uiState.mediaGroups.forEach { group ->
-                item(key = "header_${group.label}") {
+            groupedRows.forEach { (group, rows) ->
+                item(key = "header_${group.label}", contentType = "dateHeader") {
                     DateGroupHeader(group.label)
                 }
-                val rows = group.items.chunked(columns)
-                itemsIndexed(rows, key = { idx, _ -> "row_${group.label}_$idx" }) { _, row ->
+                itemsIndexed(rows, key = { idx, _ -> "row_${group.label}_$idx" }, contentType = { _, _ -> "mediaRow" }) { _, row ->
                     MediaGridRow(
                         items           = row,
                         columns         = columns,

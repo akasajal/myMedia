@@ -324,7 +324,8 @@ fun AlbumDetailScreen(
     listState: LazyListState = rememberLazyListState(),
 ) {
     val scope = rememberCoroutineScope()
-    val flatItems = groups.flatMap { it.items }
+    val flatItems = remember(groups) { groups.flatMap { it.items } }
+    val groupedRows = remember(groups, columns) { groups.map { it to it.items.chunked(columns) } }
 
     BackHandler(enabled = selection.isActive) {
         onSelectionChange(SelectionState())
@@ -370,10 +371,9 @@ fun AlbumDetailScreen(
                     .pinchToAdjustColumns(columns, onColumnsChange),
                 contentPadding = PaddingValues(bottom = 80.dp),
             ) {
-                groups.forEach { group ->
-                    item(key = "header_${group.label}") { DateGroupHeader(group.label) }
-                    val rows = group.items.chunked(columns)
-                    itemsIndexed(rows, key = { i, _ -> "row_${group.label}_$i" }) { _, row ->
+                groupedRows.forEach { (group, rows) ->
+                    item(key = "header_${group.label}", contentType = "dateHeader") { DateGroupHeader(group.label) }
+                    itemsIndexed(rows, key = { i, _ -> "row_${group.label}_$i" }, contentType = { _, _ -> "mediaRow" }) { _, row ->
                         MediaGridRow(
                             items           = row,
                             columns         = columns,

@@ -13,6 +13,11 @@ import com.ishaan.myMedia.data.repository.MediaRepository
 import com.ishaan.myMedia.data.repository.PrivacyRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -46,6 +51,11 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     private val repo        = MediaRepository(app)
     private val privacyRepo = PrivacyRepository(app)
     private val operationMutex = Mutex()
+    private var loadJob: Job? = null
+    private var refreshJob: Job? = null
+    private var loadKey: String? = null
+    private var hasCheckedInitialAccess = false
+    @Volatile private var hasLoadedMedia = false
 
     private val _uiState = MutableStateFlow(GalleryUiState())
     val uiState: StateFlow<GalleryUiState> = _uiState.asStateFlow()
@@ -77,18 +87,38 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         loadMedia()
     }
 
+    @Synchronized
+    fun refreshMediaOnResume() {
+        val requestKey = repo.loadConfigurationKey()
+        if (!hasCheckedInitialAccess) {
+            hasCheckedInitialAccess = true
+            // init already requested this exact library and permission configuration.
+            if (loadKey == requestKey) return
+        }
+        loadMedia()
+    }
+
+    @Synchronized
     fun loadMedia() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        val requestKey = repo.loadConfigurationKey()
+        if (loadJob?.isActive == true && loadKey == requestKey) return
+        loadJob?.cancel()
+        refreshJob?.cancel()
+        loadKey = requestKey
+        loadJob = viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isLoading = !hasLoadedMedia, errorMessage = null) }
             try {
                 val rawMedia = repo.loadAllMedia()             // unfiltered — for folder tree + re-applying visibility
                 val allFolderPaths = rawMedia.map { it.albumId }.toSet()
-                val media   = rawMedia.filter { repo.isFolderVisible(it.albumId) }  // for display
+                val media   = repo.filterVisibleMedia(rawMedia)  // for display
                 val groups  = repo.groupByDate(media)
                 val albums  = repo.buildAlbums(media)
                 val destinations = repo.buildDestinationAlbums(media)
                 val favs    = media.filter { repo.isFavorite(it.id) }
                 val deleted = repo.getDeletedItems()
+                val folderTree = repo.getFolderTree(allFolderPaths)
+                currentCoroutineContext().ensureActive()
+                hasLoadedMedia = true
                 _uiState.update {
                     it.copy(
                         isLoading      = false,
@@ -101,29 +131,38 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                         deletedItems   = deleted,
                         totalStorageUsage = repo.calculateStorageUsage(media),
                         allFolderPaths = allFolderPaths,
-                        folderTree     = repo.getFolderTree(allFolderPaths),
+                        folderTree     = folderTree,
                     )
                 }
 
                 // Trigger background refresh for SAF
-                refreshSafInBackground()
+                refreshSafInBackground(requestKey)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
             }
         }
     }
 
-    private fun refreshSafInBackground() {
-        viewModelScope.launch {
+    @Synchronized
+    private fun refreshSafInBackground(requestKey: String) {
+        if (loadKey != requestKey) return
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val updatedSaf = repo.refreshSafMedia()
                 // Use the same file identity rules as the initial load, not source-specific IDs.
                 val rawMedia = repo.mergeMedia(_uiState.value.rawMedia + updatedSaf)
-                val media = rawMedia.filter { repo.isFolderVisible(it.albumId) }
+                // Do not rebuild grids when a scan found no media changes.
+                if (rawMedia == _uiState.value.rawMedia) return@launch
+                val media = repo.filterVisibleMedia(rawMedia)
                 val groups = repo.groupByDate(media)
                 val albums = repo.buildAlbums(media)
                 val destinations = repo.buildDestinationAlbums(media)
                 val allFolderPaths = rawMedia.map { it.albumId }.toSet()
+                val folderTree = repo.getFolderTree(allFolderPaths)
+                currentCoroutineContext().ensureActive()
                 _uiState.update { it.copy(
                     rawMedia = rawMedia,
                     allMedia = media,
@@ -133,8 +172,10 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                     favorites = media.filter { item -> item.isFavorite },
                     totalStorageUsage = repo.calculateStorageUsage(media),
                     allFolderPaths = allFolderPaths,
-                    folderTree = repo.getFolderTree(allFolderPaths),
+                    folderTree = folderTree,
                 ) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -146,7 +187,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     fun addFolder(treeUri: Uri) {
         repo.addSafUri(treeUri)
         refreshFolders()
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repo.refreshSafMedia()  // populate the SAF cache for the new folder first
             loadMedia()             // then load — cache is warm, media appears immediately
         }
@@ -172,8 +213,8 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         _uiState.update { it.copy(chosenFolders = folders, folderTree = newTree) }
 
         // buildAlbums is suspend, so refilter media in a coroutine.
-        viewModelScope.launch {
-            val visibleMedia = _uiState.value.rawMedia.filter { repo.isFolderVisible(it.albumId) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val visibleMedia = repo.filterVisibleMedia(_uiState.value.rawMedia)
             val groups = repo.groupByDate(visibleMedia)
             val albums = repo.buildAlbums(visibleMedia)
             val destinations = repo.buildDestinationAlbums(visibleMedia)
