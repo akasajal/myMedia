@@ -154,7 +154,8 @@ private fun SelectionToolbar(
     Surface(
         tonalElevation  = 4.dp,
         shadowElevation = 4.dp,
-        modifier        = Modifier.fillMaxWidth().statusBarsPadding(),
+        // The parent scaffold already applies the system-bar inset above the Media header.
+        modifier        = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier
