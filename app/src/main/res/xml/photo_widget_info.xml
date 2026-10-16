@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="390dp" android:minHeight="390dp"
-    android:targetCellWidth="6" android:targetCellHeight="6"
+    android:minWidth="390dp" android:minHeight="530dp"
+    android:targetCellWidth="6" android:targetCellHeight="8"
     android:minResizeWidth="180dp" android:minResizeHeight="80dp"
     android:initialLayout="@layout/photo_widget_empty"
     android:previewLayout="@layout/photo_widget_empty"

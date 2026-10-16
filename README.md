@@ -20,7 +20,7 @@ See [CHANGELOG.md](CHANGELOG.md) for **v1.2** and earlier changes.
 
 ## Photo widget
 
-Open your launcher's widget picker, choose **My Media Photos**, and place the widget. Select a particular image, one folder, or multiple folders, then tap **Add widget**. You can also add a folder to the app from this configuration screen. The default size is 6 rows × 6 columns; actual sizing depends on the launcher and available grid space.
+Open your launcher's widget picker, choose **My Media Photos**, and place the widget. Select a particular image, one folder, or multiple folders, then tap **Add widget**. You can also add a folder to the app from this configuration screen. The default size is 8 rows × 6 columns; actual sizing depends on the launcher and available grid space.
 
 Folder slideshows include photos from descendants and combine overlapping selections without duplicate files. Choose a 15-second, 30-second, 1-minute, or 5-minute interval. Shuffle changes the order when the collection reloads. GIFs appear as still frames; videos are excluded. Tap a photo to open a zoomable view. To reconfigure, touch and hold the widget and choose the launcher's Edit/settings action. This uses Android's reconfigurable-widget support; the menu wording and availability depend on the launcher. The widget has no overlaid controls. Empty or locked placeholders can also be tapped to open configuration.
 
