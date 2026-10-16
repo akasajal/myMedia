@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/photo_widget_background" android:clipToOutline="true">
+    <TextView android:id="@+id/widget_empty" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:gravity="center" android:padding="40dp" android:text="@string/widget_setup" android:textColor="#FFFFFF" android:textSize="16sp" />
+    <ImageButton android:id="@+id/widget_configure" android:layout_width="48dp" android:layout_height="48dp" android:layout_gravity="top|end"
+        android:layout_margin="4dp" android:background="@drawable/photo_widget_control" android:src="@drawable/photo_widget_settings"
+        android:contentDescription="@string/widget_configure" android:padding="12dp" />
+</FrameLayout>

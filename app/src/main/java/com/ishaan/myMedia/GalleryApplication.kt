@@ -1,6 +1,8 @@
 package com.ishaan.myMedia
 
 import android.app.Application
+import android.content.SharedPreferences
+import com.ishaan.myMedia.widget.PhotoWidgetProvider
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
@@ -8,6 +10,18 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 
 class GalleryApplication : Application(), ImageLoaderFactory {
+    // Keep a strong reference: SharedPreferences retains listeners weakly.
+    private val widgetPreferencesListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "pin_enabled" || key == "saf_uris" || key == "recycle_bin" ||
+            key == "saf_cache" || key?.startsWith("folder_visible_") == true) {
+            PhotoWidgetProvider.updateAll(this)
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        getSharedPreferences("gallery_prefs", MODE_PRIVATE).registerOnSharedPreferenceChangeListener(widgetPreferencesListener)
+    }
 
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
