@@ -16,10 +16,11 @@ Entries describe application behavior; the audit records the individual accessib
 
 ### Validation
 
-- Kotlin/resource compilation and all 12 local unit tests passed. Launcher rendering, rotation, screen-off behavior, resizing, and accessibility require device verification; see `WIDGET_TESTING.md`.
+- Kotlin/resource compilation and all 14 local unit tests passed. Launcher rendering, rotation, screen-off behavior, resizing, and accessibility require device verification; see `WIDGET_TESTING.md`.
 
 ### Fixed
 
+- Blurry widget photos caused by a fixed 180,000-pixel thumbnail budget. Frames now use physical widget dimensions and display density, with a screen-based limit of up to 2 megapixels and shared-memory bitmap delivery.
 - Saving widget configuration now invalidates the photo collection and replaces the slideshow view, preventing cached photos and framing from surviving edits at the same rotation interval.
 
 ## 1.1

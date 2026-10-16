@@ -7,6 +7,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
+import android.content.res.Configuration
+import android.os.Build
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import androidx.core.graphics.drawable.toBitmap
@@ -14,6 +16,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import coil.size.Scale
+import coil.size.Precision
 import com.ishaan.myMedia.R
 import com.ishaan.myMedia.data.model.MediaItem
 import com.ishaan.myMedia.data.model.MediaType
@@ -41,13 +44,18 @@ class PhotoWidgetService : RemoteViewsService() {
 private class PhotoFactory(private val context: Context, private val id: Int) : RemoteViewsService.RemoteViewsFactory {
     private var config = PhotoWidgetConfig()
     private var items = emptyList<MediaItem>()
-    private var bitmapSize = 600 to 300
+    private var bitmapSize = 1 to 1
     override fun onCreate() = Unit
     override fun onDataSetChanged() {
         config = PhotoWidgetStore(context).read(id) ?: run { items = emptyList(); return }
         val options = AppWidgetManager.getInstance(context).getAppWidgetOptions(id)
-        bitmapSize = widgetBitmapSize(options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 300),
-            options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 150))
+        val metrics = context.resources.displayMetrics
+        val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val widthKey = if (landscape) AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH
+        val heightKey = if (landscape) AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT
+        bitmapSize = widgetBitmapSize(options.getInt(widthKey, 390), options.getInt(heightKey, 530),
+            density = metrics.density,
+            maxPixels = metrics.widthPixels.coerceAtLeast(1).toLong() * metrics.heightPixels.coerceAtLeast(1))
         items = runBlocking(Dispatchers.IO) {
             try { widgetImages(context, config) } catch (_: Exception) { emptyList() }
         }
@@ -63,10 +71,12 @@ private class PhotoFactory(private val context: Context, private val id: Int) : 
             try {
                 val (width, height) = bitmapSize
                 val request = ImageRequest.Builder(context).data(item.uri).size(width, height)
-                    .scale(if (config.fit) Scale.FIT else Scale.FILL).allowHardware(false).build()
+                    .scale(if (config.fit) Scale.FIT else Scale.FILL).precision(Precision.EXACT)
+                    .allowHardware(false).build()
                 (context.imageLoader.execute(request) as? SuccessResult)?.drawable?.toBitmap()?.let { source ->
                     // Render a bounded bitmap without stretching portrait or panoramic photos.
                     Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { output ->
+                        output.density = Bitmap.DENSITY_NONE
                         val canvas = Canvas(output)
                         canvas.drawColor(android.graphics.Color.rgb(22, 19, 29))
                         val sx = width.toFloat() / source.width
@@ -75,6 +85,13 @@ private class PhotoFactory(private val context: Context, private val id: Int) : 
                         val w = source.width * scale
                         val h = source.height * scale
                         canvas.drawBitmap(source, null, RectF((width - w) / 2, (height - h) / 2, (width + w) / 2, (height + h) / 2), Paint(Paint.FILTER_BITMAP_FLAG))
+                    }.let { rendered ->
+                        // Large pixel buffers travel through shared memory rather than inline Binder data.
+                        // Older releases share immutable bitmap pixels when parceling RemoteViews.
+                        val shared = if (Build.VERSION.SDK_INT >= 31) rendered.asShared()
+                            else rendered.copy(Bitmap.Config.ARGB_8888, false)
+                        if (shared !== rendered) rendered.recycle()
+                        shared
                     }
                 }
             } catch (_: Exception) { null }

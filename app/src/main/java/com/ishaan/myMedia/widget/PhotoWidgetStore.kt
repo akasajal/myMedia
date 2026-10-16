@@ -33,12 +33,18 @@ internal fun widgetFolderVisible(album: String, isVisible: (String) -> Boolean):
 
 internal val widgetIntervals = listOf(15, 30, 60, 300)
 
-/** Keep each RemoteViews bitmap below 720 KB, regardless of source or widget size. */
-internal fun widgetBitmapSize(width: Int, height: Int): Pair<Int, Int> {
-    val w = width.coerceAtLeast(1).toDouble()
-    val h = height.coerceAtLeast(1).toDouble()
-    val scale = sqrt(180_000.0 / (w * h))
-    return (w * scale).toInt().coerceIn(1, 180_000) to (h * scale).toInt().coerceIn(1, 180_000)
+internal const val MAX_WIDGET_PIXELS = 2_000_000L
+
+/** Match physical widget pixels, bounded by a screen-sized budget and a 2 MP ceiling. */
+internal fun widgetBitmapSize(widthDp: Int, heightDp: Int, density: Float = 1f,
+    maxPixels: Long = MAX_WIDGET_PIXELS): Pair<Int, Int> {
+    val safeDensity = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+    val w = widthDp.coerceAtLeast(1).toDouble() * safeDensity
+    val h = heightDp.coerceAtLeast(1).toDouble() * safeDensity
+    val budget = maxPixels.coerceIn(1, MAX_WIDGET_PIXELS)
+    val scale = minOf(1.0, sqrt(budget / (w * h)))
+    return (w * scale).toInt().coerceIn(1, budget.toInt()) to
+        (h * scale).toInt().coerceIn(1, budget.toInt())
 }
 
 class PhotoWidgetStore(context: Context) {

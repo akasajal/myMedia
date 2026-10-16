@@ -4,7 +4,7 @@
 
 `./gradlew :app:compileDebugKotlin :app:testDebugUnitTest --offline --no-configuration-cache`
 
-Kotlin/resource compilation and all 12 unit tests passed during implementation. Six widget tests cover per-widget app-lock permission, descendant folder matching, hidden ancestors, path boundaries, overlapping selections, bitmap aspect ratios, and the 720 KB per-image memory ceiling. The remaining six are existing seek/crop regression tests.
+Kotlin/resource compilation and all 14 unit tests passed during implementation. Eight widget tests cover per-widget app-lock permission, descendant folder matching, hidden ancestors, path boundaries, overlapping selections, bitmap aspect ratios, display-density sizing, and screen-based memory limits. Widget frames are capped at 2 megapixels (8 MB in ARGB), or one screen of pixels if smaller, and use shared-memory bitmap delivery. The remaining six are existing seek/crop regression tests.
 
 No APK was assembled or installed as part of these checks. The following launcher checks remain unverified.
 
@@ -19,6 +19,7 @@ No APK was assembled or installed as part of these checks. The following launche
 - Switch launcher pages and open another app; check visibility-dependent pausing and return behavior on the device's launcher.
 - Add two widgets with different sources and intervals; verify long-press Edit/settings and photo-opening actions affect the correct widget. Check that no next/menu buttons overlay photos or placeholders. Confirm long-press opens the launcher's widget menu and its Edit/settings action opens configuration; wording and support vary by launcher.
 - Resize horizontally and vertically; verify cropping, fit framing, controls, and image clarity. Also check landscape and launcher recreation.
+- On a high-density display, compare the widget photo with the original at matching size. A 347 × 494 dp widget at 3× density should request 1041 × 1482 pixels rather than the old roughly 355 × 506 frame. Verify sharpness in both fit/fill modes, rotation between photos, and repeated resizing without memory or Binder errors. Check on API 26–30 as well as API 31+ for bitmap delivery compatibility.
 - Add widgets with app lock both enabled and disabled. Keep "Show photos while app lock is enabled" off and verify Add/Save completes without a warning. Turn the setting on and verify Allow enables it, while Deny/dismiss leaves it off; the dialog must not save the widget automatically. Rotate while the warning is open and confirm it survives. After allowing, turn the setting off again and verify saving does not prompt.
 - Allow one widget and deny another, then enable PIN lock with photos already displayed. Verify the allowed widget continues displaying/rotating, while the denied widget becomes a placeholder. Revoke and grant permission in widget settings and verify immediate updates and persistence after restart. Existing pre-consent widget configurations must default to Deny.
 - Test PIN and biometric access when opening a photo or configuration from an allowed widget. Home-screen display permission must not bypass authentication or expose hidden-folder media.
