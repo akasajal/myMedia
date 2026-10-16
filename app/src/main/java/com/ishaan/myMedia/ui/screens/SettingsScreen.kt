@@ -127,29 +127,21 @@ fun SettingsScreen(
             StorageAnalytics(totalSize = uiState.totalStorageUsage)
         }
 
-        item { SettingsSection(stringResource(R.string.about_heading)) }
-        item { AboutApp() }
-        item {
-            LegalSettingsRow(stringResource(R.string.terms_title), Icons.Rounded.Description) {
-                onOpenLegalDocument(LegalDocument.TERMS)
-            }
-        }
-        item {
-            LegalSettingsRow(stringResource(R.string.privacy_policy_title), Icons.Rounded.Policy) {
-                onOpenLegalDocument(LegalDocument.PRIVACY)
-            }
-        }
+        item { AboutApp(onOpenLegalDocument) }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AboutApp() {
+private fun AboutApp(onOpenLegalDocument: (LegalDocument) -> Unit) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val version = remember(context) { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(stringResource(R.string.about_heading), style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.about_app_version, version), style = MaterialTheme.typography.titleMedium)
             FlowRow(verticalArrangement = Arrangement.Center) {
                 Text(stringResource(R.string.about_developed_by), modifier = Modifier.align(Alignment.CenterVertically),
@@ -160,18 +152,15 @@ private fun AboutApp() {
                     modifier = Modifier.semantics { contentDescription = context.getString(R.string.about_developer_link) },
                 ) { Text("sajal", style = MaterialTheme.typography.bodyLarge) }
             }
-        }
-    }
-}
-
-@Composable
-private fun LegalSettingsRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Row(Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(12.dp))
-            Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onOpenLegalDocument(LegalDocument.TERMS) }, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.terms_title), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
+                TextButton(onClick = { onOpenLegalDocument(LegalDocument.PRIVACY) }, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.privacy_policy_title), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
+            }
         }
     }
 }
