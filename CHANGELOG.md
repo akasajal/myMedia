@@ -10,7 +10,7 @@ Entries describe application behavior; the audit records the individual accessib
 - Folder slideshow intervals of 15 seconds, 30 seconds, 1 minute, and 5 minutes, with shuffle, fit/fill framing, and independent configuration per widget. Photos have no overlaid buttons; reconfiguration uses the launcher's long-press Edit/settings action.
 - Launcher-managed slideshow rotation without a persistent background service. Hidden-window time does not advance the slideshow; returning starts a fresh interval rather than resuming the partial countdown.
 - A zoomable photo view opened from the widget, protected by the app's PIN/biometric lock.
-- Widget privacy updates when folder visibility, selected roots, the scan cache, recycle-bin entries, or PIN-lock settings change. Setup asks Allow/Deny for displaying photos while app lock is enabled, with a separate saved choice per widget and a setting to change it. Existing widgets default to Deny. Opening photos or configuration still requires authentication.
+- Widget privacy updates when folder visibility, selected roots, the scan cache, recycle-bin entries, or PIN-lock settings change. Enabling display while app lock is enabled asks Allow/Deny, with a separate saved choice per widget. The setting defaults to off; saving with it off does not prompt. Opening photos or configuration still requires authentication.
 - Bounded widget bitmap rendering and regression tests for folder boundaries, overlapping selections, and image memory limits.
 
 ### Validation

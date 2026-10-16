@@ -151,10 +151,8 @@ private fun WidgetConfiguration(
     var interval by rememberSaveable { mutableIntStateOf(saved?.intervalSeconds ?: 15) }
     var shuffle by rememberSaveable { mutableStateOf(saved?.shuffle ?: false) }
     var fit by rememberSaveable { mutableStateOf(saved?.fit ?: false) }
-    // Ask for every new widget, even if app lock is currently disabled.
-    var allowWhileLocked by rememberSaveable { mutableStateOf<Boolean?>(saved?.allowWhileLocked) }
+    var allowWhileLocked by rememberSaveable { mutableStateOf(saved?.allowWhileLocked ?: false) }
     var showPrivacyWarning by rememberSaveable { mutableStateOf(false) }
-    var saveAfterPrivacyChoice by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val repo = remember(context) { MediaRepository(context) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri -> if (uri != null) onAddFolder(uri) }
@@ -185,12 +183,10 @@ private fun WidgetConfiguration(
     fun choosePrivacy(allow: Boolean) {
         allowWhileLocked = allow
         showPrivacyWarning = false
-        if (saveAfterPrivacyChoice && canSave) saveConfiguration(allow)
-        saveAfterPrivacyChoice = false
     }
     if (showPrivacyWarning) {
         AlertDialog(
-            onDismissRequest = { showPrivacyWarning = false; saveAfterPrivacyChoice = false },
+            onDismissRequest = { showPrivacyWarning = false },
             title = { Text(stringResource(R.string.widget_privacy_warning_title)) },
             text = { Text(stringResource(R.string.widget_privacy_warning)) },
             confirmButton = { TextButton(onClick = { choosePrivacy(true) }) { Text(stringResource(R.string.widget_allow)) } },
@@ -204,11 +200,7 @@ private fun WidgetConfiguration(
     }, bottomBar = {
         Surface(tonalElevation = 3.dp) {
             Button(
-                onClick = {
-                    val allowed = allowWhileLocked
-                    if (allowed == null) { saveAfterPrivacyChoice = true; showPrivacyWarning = true }
-                    else saveConfiguration(allowed)
-                },
+                onClick = { saveConfiguration(allowWhileLocked) },
                 enabled = canSave,
                 modifier = Modifier.navigationBarsPadding().padding(16.dp).fillMaxWidth(),
             ) { Text(stringResource(if (saved == null) R.string.widget_add else R.string.widget_save)) }
@@ -224,8 +216,8 @@ private fun WidgetConfiguration(
                 }
             }
             item {
-                WidgetToggle(stringResource(R.string.widget_show_while_locked), allowWhileLocked == true) { allow ->
-                    if (allow) { saveAfterPrivacyChoice = false; showPrivacyWarning = true }
+                WidgetToggle(stringResource(R.string.widget_show_while_locked), allowWhileLocked) { allow ->
+                    if (allow) showPrivacyWarning = true
                     else allowWhileLocked = false
                 }
                 Text(stringResource(R.string.widget_privacy_note), color = MaterialTheme.colorScheme.onSurfaceVariant,
